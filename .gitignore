@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Renders and test outputs
+*.png
+*.blend
+*.blend1
+log.txt
+
+# GeoJSON test data (keep only tests/)
+rectangle.geojson
+rectangle_small.geojson
+sample_bbox.geojson
+
+# macOS
+.DS_Store
+
+# Misc
+execute.sh
