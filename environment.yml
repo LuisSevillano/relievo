@@ -1,0 +1,13 @@
+name: blender-relief
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - gdal>=3.6
+  - pyproj>=3.5
+  - pip
+  - pip:
+    - click>=8.0
+    - requests>=2.25
+    - -e .
