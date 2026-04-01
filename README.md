@@ -102,6 +102,7 @@ blender-relief \
 | `--template PATH` | *(required)* | Path to the `.blend` template file. |
 | `--output PATH` | *(required)* | Output PNG file path. |
 | `--dem PATH` | — | Path to an existing DEM GeoTIFF. If omitted, the DEM is downloaded from OpenTopography. |
+| `--save-dem PATH` | — | Save the downloaded DEM to this path after downloading. Useful to reuse it later with `--dem` and avoid re-downloading the same area. Ignored when `--dem` is provided. |
 | `--buffer FLOAT` | `0.05` | Buffer applied to the bbox **before downloading**, as a fraction of its size (`0.05` = 5%). Prevents data loss at the edges after reprojection. Set to `0` to disable. Ignored when `--dem` is provided. |
 | `--crs TEXT` | — | Target CRS for reprojection (e.g. `EPSG:3857`, `EPSG:32628`). If omitted, the DEM is used as downloaded with no reprojection. |
 | `--demtype TEXT` | `SRTMGL1` | OpenTopography dataset. See table below or run `blender-relief --list-demtypes`. |

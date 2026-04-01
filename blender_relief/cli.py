@@ -69,6 +69,10 @@ def _find_blender(blender_bin: str) -> str:
     help="Path to an existing DEM GeoTIFF. If omitted, downloads from OpenTopography.",
 )
 @click.option(
+    "--save-dem", type=click.Path(), default=None,
+    help="Save the downloaded DEM to this path. Useful to reuse it later with --dem and skip re-downloading.",
+)
+@click.option(
     "--crs", default=None,
     help="Target CRS for DEM reprojection (e.g. EPSG:3857, EPSG:32628). If omitted, the DEM is used as-is with no reprojection.",
 )
@@ -115,7 +119,7 @@ def _find_blender(blender_bin: str) -> str:
     "--keep-workdir", is_flag=True, default=False,
     help="Do not delete the temporary working directory after render.",
 )
-def main(bbox, template, output, buffer, dem, crs, demtype, api_key, exaggeration, samples, max_size, scale, verbose, blender_bin, keep_workdir):
+def main(bbox, template, output, buffer, dem, save_dem, crs, demtype, api_key, exaggeration, samples, max_size, scale, verbose, blender_bin, keep_workdir):
     """Create a shaded relief PNG from a DEM using Blender.
 
     Automates the Daniel Huffman shaded relief workflow:
@@ -158,6 +162,10 @@ def main(bbox, template, output, buffer, dem, crs, demtype, api_key, exaggeratio
             download_bbox = buffer_bbox(bbox_wgs84, buffer) if buffer > 0 else bbox_wgs84
             log.debug(f"Buffer: {buffer*100:.0f}% applied to download bbox")
             download_dem(download_bbox, demtype, api_key, raw_dem_path)
+            if save_dem:
+                save_dem_abs = str(pathlib.Path(save_dem).resolve())
+                shutil.copy2(raw_dem_path, save_dem_abs)
+                log.info(f"DEM saved  →  {save_dem_abs}")
             input_dem = raw_dem_path
         else:
             input_dem = str(pathlib.Path(dem).resolve())
