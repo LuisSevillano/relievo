@@ -35,6 +35,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scale", type=int, default=100)
     parser.add_argument("--exaggeration", type=float, default=None)
     parser.add_argument("--samples", type=int, default=None)
+    parser.add_argument("--light-azimuth", type=float, default=None)
+    parser.add_argument("--light-altitude", type=float, default=None)
     parser.add_argument("--output", required=True)
     return parser.parse_args(argv)
 
@@ -126,6 +128,22 @@ def main() -> None:
 
     if args.samples is not None:
         scene.cycles.samples = args.samples
+
+    if args.light_azimuth is not None or args.light_altitude is not None:
+        import math
+        sun = next(
+            (o for o in bpy.data.objects if o.type == "LIGHT" and o.data.type == "SUN"),
+            None,
+        )
+        if sun:
+            cur_az = math.degrees(sun.rotation_euler[2])
+            cur_alt = 90.0 - math.degrees(sun.rotation_euler[0])
+            az = args.light_azimuth if args.light_azimuth is not None else cur_az
+            alt = args.light_altitude if args.light_altitude is not None else cur_alt
+            sun.rotation_euler = (math.radians(90.0 - alt), 0.0, math.radians(az))
+            print(f"Sun light: azimuth={az:.1f}° altitude={alt:.1f}°")
+        else:
+            print("Warning: no SUN lamp found in template — --light-azimuth/--light-altitude ignored.")
 
     scene.render.filepath = args.output
     scene.render.image_settings.file_format = "PNG"
