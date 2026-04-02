@@ -11,6 +11,8 @@ dependencies = [
     "click>=8.0",
     "requests>=2.25",
     "pyproj>=3.0",
+    "Pillow>=9.0",
+    "tomli>=1.1; python_version < '3.11'",
     # gdal (osgeo) must be installed via conda-forge, NOT pip
 ]
 
@@ -19,3 +21,6 @@ blender-relief = "blender_relief.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
