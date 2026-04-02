@@ -25,6 +25,8 @@ def render(
     scale: int,
     samples: int,
     output_path: str,
+    light_azimuth: float = None,
+    light_altitude: float = None,
 ) -> None:
     """Run Blender in background mode to render the shaded relief PNG.
 
@@ -50,6 +52,8 @@ def render(
         "--scale", str(scale),
         *_opt("--exaggeration", exaggeration),
         *_opt("--samples", samples),
+        *_opt("--light-azimuth", light_azimuth),
+        *_opt("--light-altitude", light_altitude),
         "--output", str(pathlib.Path(output_path).resolve()),
     ]
 
