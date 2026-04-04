@@ -7,23 +7,30 @@ Replicates the logic of blenderize.sh by Nick Underwood:
   4. Return real-world dimensions from geotransform
 """
 
-import sys
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 
 try:
     from osgeo import gdal
+    gdal.UseExceptions()
+    _GDAL_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "GDAL Python bindings not found. Install via:\n"
-        "  conda install -c conda-forge gdal"
-    )
+    gdal = None  # type: ignore[assignment]
+    _GDAL_AVAILABLE = False
 
 from pyproj import Transformer
 
 from . import log
 
-gdal.UseExceptions()
+
+def _require_gdal():
+    if not _GDAL_AVAILABLE:
+        raise ImportError(
+            "GDAL Python bindings not found. Install via:\n"
+            "  conda install -c conda-forge gdal"
+        )
 
 
 @dataclass
@@ -72,6 +79,7 @@ def process_dem(
         output_path: Absolute path for the output dem_blender.tif.
         workdir: Temporary directory for intermediate files.
     """
+    _require_gdal()
     if target_crs:
         reprojected_path = str(Path(workdir) / "a2_reprojected.tif")
         log.info(f"Processing DEM  →  {target_crs}")
