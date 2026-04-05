@@ -1,0 +1,22 @@
+# Hypsometric color ramp for gdaldem color-relief
+# Format: elevation_m  R  G  B
+#
+# Usage:
+#   blender-relief --bbox region.geojson --template relief.blend \
+#     --output out.png --color-relief examples/ramp_terrain.txt
+#
+# Adjust elevation values to match your area's elevation range.
+
+-500    50   100 200   # deep water
+0       70   130 180   # shallow water / sea level
+1       194  178 128   # coast / sand
+200     210  190 140   # lowlands
+500     140  180 100   # hills / forest
+1000    100  140  70   # mid-altitude forest
+1500    160  130  90   # sub-alpine
+2000    180  160 120   # alpine / rock
+2500    210  200 180   # high rock
+3000    230  220 210   # snow line
+4000    245  240 235   # glaciers
+5000    255  255 255   # permanent snow
+nv        0    0   0   # nodata → transparent

@@ -10,4 +10,6 @@ dependencies:
   - pip:
     - click>=8.0
     - requests>=2.25
+    - Pillow>=9.0
+    - tomli>=1.1
     - -e .
