@@ -159,15 +159,20 @@ def apply_clip_mask(
 def apply_color_relief(
     render_png: str,
     dem_path: str,
+    dem_blender_path: str,
     color_ramp: str,
     output_path: str,
 ) -> None:
     """Composite a hypsometric color tint over the rendered shaded relief.
 
-    Runs ``gdaldem color-relief`` on the processed DEM, resizes the result to
-    match the render dimensions, and blends it with the render using multiply
-    mode. The output is an RGBA PNG (the alpha channel comes from the color
-    relief, so nodata areas become transparent).
+    Runs ``gdaldem color-relief`` on the source DEM (real elevation values in
+    metres), resizes the result to match the render dimensions, and blends it
+    with the render using multiply mode.
+
+    The source DEM may have a larger extent than the render (e.g. download
+    buffer). ``dem_blender_path`` is used as the reference to crop the source
+    DEM to the exact same geographic extent before running gdaldem, ensuring
+    pixel-perfect alignment.
 
     The color ramp file follows the standard ``gdaldem color-relief`` format::
 
@@ -180,16 +185,48 @@ def apply_color_relief(
 
     Args:
         render_png: Path to the rendered PNG produced by Blender.
-        dem_path: Path to the processed DEM GeoTIFF (dem_blender.tif).
+        dem_path: Source DEM with real elevation values in metres.
+        dem_blender_path: UInt16-rescaled DEM (same extent as render). Used
+            only to read the geographic extent for cropping dem_path.
         color_ramp: Path to a gdaldem color ramp text file.
         output_path: Destination path for the composited PNG.
     """
-    with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
-        color_tif = str(pathlib.Path(tmpdir) / "color_relief.tif")
-        color_png = str(pathlib.Path(tmpdir) / "color_relief.png")
+    if not _GDAL_AVAILABLE:
+        raise ImportError("GDAL is required for --color-relief. Install via conda-forge.")
 
-        # Step 1: generate color relief as GeoTIFF (without -alpha to keep 3 bands)
-        cmd = ["gdaldem", "color-relief", dem_path, color_ramp, color_tif]
+    # Read the exact geographic extent from dem_blender_path
+    ds = gdal.Open(dem_blender_path)
+    if ds is None:
+        raise RuntimeError(f"Cannot open DEM for extent: {dem_blender_path}")
+    gt = ds.GetGeoTransform()
+    w, h = ds.RasterXSize, ds.RasterYSize
+    west  = gt[0]
+    north = gt[3]
+    east  = gt[0] + gt[1] * w
+    south = gt[3] + gt[5] * h
+    ds = None
+
+    with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
+        cropped_tif = str(pathlib.Path(tmpdir) / "dem_cropped.tif")
+        color_tif   = str(pathlib.Path(tmpdir) / "color_relief.tif")
+        color_png   = str(pathlib.Path(tmpdir) / "color_relief.png")
+
+        # Step 1: crop source DEM to the exact same extent as dem_blender_path
+        # so the color relief aligns pixel-perfectly with the render.
+        cmd_crop = [
+            "gdal_translate",
+            "-projWin", str(west), str(north), str(east), str(south),
+            dem_path, cropped_tif,
+        ]
+        log.debug(f"Cropping DEM to render extent: {' '.join(cmd_crop)}")
+        proc = subprocess.run(cmd_crop, capture_output=True)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"gdal_translate (crop) failed:\n{proc.stderr.decode(errors='replace')}"
+            )
+
+        # Step 2: generate color relief as RGB GeoTIFF
+        cmd = ["gdaldem", "color-relief", cropped_tif, color_ramp, color_tif]
         log.debug(f"Running: {' '.join(cmd)}")
         proc = subprocess.run(cmd, capture_output=True)
         if proc.returncode != 0:
@@ -197,19 +234,17 @@ def apply_color_relief(
                 f"gdaldem color-relief failed:\n{proc.stderr.decode(errors='replace')}"
             )
 
-        # Step 2: convert GeoTIFF → PNG so Pillow can read it reliably
-        # (Pillow misreads alpha channels from GDAL-produced GeoTIFFs)
+        # Step 3: convert GeoTIFF → PNG so Pillow can read it reliably
         cmd2 = ["gdal_translate", "-of", "PNG", color_tif, color_png]
         subprocess.run(cmd2, capture_output=True, check=True)
 
-        # Step 3: resize color relief to match render dimensions
+        # Step 4: resize color relief to render pixel dimensions and multiply-blend
         render_rgb = _open_as_rgb8(render_png)
         render_w, render_h = render_rgb.size
         color_rgb = Image.open(color_png).convert("RGB").resize(
             (render_w, render_h), Image.LANCZOS
         )
-
-        # Step 4: multiply blend — render (shading) × color (tint) / 255
         blended = ImageChops.multiply(render_rgb, color_rgb)
         blended.save(output_path, format="PNG")
+
     log.info(f"Color relief applied  →  {output_path}")

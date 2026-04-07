@@ -221,12 +221,11 @@ def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
 # ---------------------------------------------------------------------------
 
 def _fake_gdaldem(cmd, capture_output, **kwargs):
-    """Simulate gdaldem color-relief or gdal_translate by writing a fake file."""
-    # gdaldem: cmd[0]="gdaldem", output is cmd[4]
-    # gdal_translate: cmd[0]="gdal_translate", output is cmd[-1]
+    """Simulate gdaldem / gdal_translate subprocess calls."""
+    # gdaldem color-relief: output is cmd[4]
+    # gdal_translate (crop or convert): output is cmd[-1]
     if cmd[0] == "gdaldem":
         output_path = cmd[4]
-        # Write a 3-band RGB TIFF (no alpha, matching the fixed implementation)
         driver = gdal.GetDriverByName("GTiff")
         ds = driver.Create(output_path, 10, 10, 3, gdal.GDT_Byte)
         for i in range(1, 4):
@@ -235,9 +234,16 @@ def _fake_gdaldem(cmd, capture_output, **kwargs):
         ds = None
     elif cmd[0] == "gdal_translate":
         output_path = cmd[-1]
-        # Write a simple PNG (3-band) so PIL can open it
-        from PIL import Image as _Image
-        _Image.new("RGB", (10, 10), (200, 200, 200)).save(output_path, "PNG")
+        if output_path.endswith(".png"):
+            from PIL import Image as _Image
+            _Image.new("RGB", (10, 10), (200, 200, 200)).save(output_path, "PNG")
+        else:
+            # crop step: copy input to output as a minimal TIFF
+            driver = gdal.GetDriverByName("GTiff")
+            ds = driver.Create(output_path, 10, 10, 1, gdal.GDT_Float32)
+            ds.GetRasterBand(1).Fill(500)
+            ds.FlushCache()
+            ds = None
     mock_result = MagicMock()
     mock_result.returncode = 0
     return mock_result
@@ -247,7 +253,7 @@ def _fake_gdaldem(cmd, capture_output, **kwargs):
 def test_color_relief_produces_file(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
     """apply_color_relief should create the output PNG."""
     output = str(tmp_path / "colored.png")
-    apply_color_relief(synthetic_png, synthetic_dem, color_ramp_file, output)
+    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output)
     import os
     assert os.path.isfile(output)
     img = Image.open(output)
@@ -259,19 +265,34 @@ def test_color_relief_output_size_matches_render(mock_run, tmp_path, synthetic_p
     """Output image dimensions must match the input render PNG."""
     output = str(tmp_path / "colored.png")
     render_w, render_h = Image.open(synthetic_png).size
-    apply_color_relief(synthetic_png, synthetic_dem, color_ramp_file, output)
+    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output)
     out_w, out_h = Image.open(output).size
     assert (out_w, out_h) == (render_w, render_h)
 
 
 @patch("blender_relief.mask.subprocess.run")
 def test_color_relief_gdaldem_failure_raises(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
-    """If gdaldem exits with non-zero, RuntimeError is raised."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stderr = b"gdaldem: error"
-    mock_run.return_value = mock_result
+    """If gdal_translate (crop) succeeds but gdaldem fails, RuntimeError is raised."""
+    call_count = [0]
 
+    def side_effect(cmd, capture_output=False, **kwargs):
+        call_count[0] += 1
+        mock_result = MagicMock()
+        if cmd[0] == "gdal_translate" and call_count[0] == 1:
+            # First call is the crop step — succeed and create output file
+            output_path = cmd[-1]
+            driver = gdal.GetDriverByName("GTiff")
+            ds = driver.Create(output_path, 10, 10, 1, gdal.GDT_Float32)
+            ds.GetRasterBand(1).Fill(500)
+            ds.FlushCache()
+            ds = None
+            mock_result.returncode = 0
+        else:
+            mock_result.returncode = 1
+            mock_result.stderr = b"gdaldem: error"
+        return mock_result
+
+    mock_run.side_effect = side_effect
     with pytest.raises(RuntimeError, match="gdaldem color-relief failed"):
-        apply_color_relief(synthetic_png, synthetic_dem, color_ramp_file,
+        apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file,
                            str(tmp_path / "out.png"))
