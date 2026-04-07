@@ -186,34 +186,30 @@ def apply_color_relief(
     """
     with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
         color_tif = str(pathlib.Path(tmpdir) / "color_relief.tif")
+        color_png = str(pathlib.Path(tmpdir) / "color_relief.png")
 
-        cmd = [
-            "gdaldem", "color-relief",
-            dem_path, color_ramp, color_tif,
-            "-alpha",
-        ]
+        # Step 1: generate color relief as GeoTIFF (without -alpha to keep 3 bands)
+        cmd = ["gdaldem", "color-relief", dem_path, color_ramp, color_tif]
         log.debug(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True)
-        if result.returncode != 0:
+        proc = subprocess.run(cmd, capture_output=True)
+        if proc.returncode != 0:
             raise RuntimeError(
-                f"gdaldem color-relief failed:\n{result.stderr.decode(errors='replace')}"
+                f"gdaldem color-relief failed:\n{proc.stderr.decode(errors='replace')}"
             )
 
-        # Load color relief (RGBA) and resize to match render
-        color_img = Image.open(color_tif).convert("RGBA")
-        render_img = Image.open(render_png)
-        render_w, render_h = render_img.size
-        color_resized = color_img.resize((render_w, render_h), Image.LANCZOS)
+        # Step 2: convert GeoTIFF → PNG so Pillow can read it reliably
+        # (Pillow misreads alpha channels from GDAL-produced GeoTIFFs)
+        cmd2 = ["gdal_translate", "-of", "PNG", color_tif, color_png]
+        subprocess.run(cmd2, capture_output=True, check=True)
 
-        # Multiply blend: render_rgb * color_rgb / 255
+        # Step 3: resize color relief to match render dimensions
         render_rgb = _open_as_rgb8(render_png)
-        color_rgb = color_resized.convert("RGB")
+        render_w, render_h = render_rgb.size
+        color_rgb = Image.open(color_png).convert("RGB").resize(
+            (render_w, render_h), Image.LANCZOS
+        )
+
+        # Step 4: multiply blend — render (shading) × color (tint) / 255
         blended = ImageChops.multiply(render_rgb, color_rgb)
-
-        # Restore alpha from color relief (nodata → transparent)
-        _, _, _, color_alpha = color_resized.split()
-        blended_rgba = blended.convert("RGBA")
-        blended_rgba.putalpha(color_alpha)
-
-        blended_rgba.save(output_path, format="PNG")
+        blended.save(output_path, format="PNG")
     log.info(f"Color relief applied  →  {output_path}")

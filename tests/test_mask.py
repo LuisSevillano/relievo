@@ -221,15 +221,23 @@ def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
 # ---------------------------------------------------------------------------
 
 def _fake_gdaldem(cmd, capture_output, **kwargs):
-    """Simulate gdaldem color-relief by writing a fake colour TIFF."""
-    output_tif = cmd[4]  # index of output path in cmd list
-    # Write a minimal 4-band RGBA TIFF
-    driver = gdal.GetDriverByName("GTiff")
-    ds = driver.Create(output_tif, 10, 10, 4, gdal.GDT_Byte)
-    for i in range(1, 5):
-        ds.GetRasterBand(i).Fill(200)
-    ds.FlushCache()
-    ds = None
+    """Simulate gdaldem color-relief or gdal_translate by writing a fake file."""
+    # gdaldem: cmd[0]="gdaldem", output is cmd[4]
+    # gdal_translate: cmd[0]="gdal_translate", output is cmd[-1]
+    if cmd[0] == "gdaldem":
+        output_path = cmd[4]
+        # Write a 3-band RGB TIFF (no alpha, matching the fixed implementation)
+        driver = gdal.GetDriverByName("GTiff")
+        ds = driver.Create(output_path, 10, 10, 3, gdal.GDT_Byte)
+        for i in range(1, 4):
+            ds.GetRasterBand(i).Fill(200)
+        ds.FlushCache()
+        ds = None
+    elif cmd[0] == "gdal_translate":
+        output_path = cmd[-1]
+        # Write a simple PNG (3-band) so PIL can open it
+        from PIL import Image as _Image
+        _Image.new("RGB", (10, 10), (200, 200, 200)).save(output_path, "PNG")
     mock_result = MagicMock()
     mock_result.returncode = 0
     return mock_result
@@ -243,7 +251,7 @@ def test_color_relief_produces_file(mock_run, tmp_path, synthetic_png, synthetic
     import os
     assert os.path.isfile(output)
     img = Image.open(output)
-    assert img.mode in ("RGB", "RGBA")
+    assert img.mode == "RGB"
 
 
 @patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
