@@ -87,6 +87,7 @@ def test_process_dem_no_crs(tmp_path):
 
     assert isinstance(result, ProcessResult)
     assert result.dem_path == output_path
+    assert result.source_dem_path  # must be populated
     assert result.raster_x > 0
     assert result.raster_y > 0
     assert result.width_m > 0

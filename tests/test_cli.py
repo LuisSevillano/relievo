@@ -25,8 +25,11 @@ def _make_process_result(tmp_path, filename="dem_blender.tif"):
     """Return a ProcessResult pointing at a real (empty) temp file."""
     p = tmp_path / filename
     p.write_bytes(b"")
+    src = tmp_path / "source_dem.tif"
+    src.write_bytes(b"")
     return ProcessResult(
         dem_path=str(p),
+        source_dem_path=str(src),
         width_m=50_000.0,
         height_m=40_000.0,
         raster_x=1200,

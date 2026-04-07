@@ -294,7 +294,9 @@ def main(
             from .mask import apply_color_relief
             color_ramp_abs = str(pathlib.Path(color_ramp).resolve())
             log.info("Applying color relief...")
-            apply_color_relief(output_abs, result.dem_path, color_ramp_abs, output_abs)
+            # Use source_dem_path (real elevation values in metres), not the
+            # UInt16-rescaled dem_blender.tif, so the ramp elevations match.
+            apply_color_relief(output_abs, result.source_dem_path, color_ramp_abs, output_abs)
 
         if clip_mask:
             from .mask import apply_clip_mask

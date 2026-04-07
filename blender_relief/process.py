@@ -35,7 +35,8 @@ def _require_gdal():
 
 @dataclass
 class ProcessResult:
-    dem_path: str
+    dem_path: str        # UInt16 rescaled DEM for Blender
+    source_dem_path: str # DEM with real elevation values in metres (for color-relief)
     width_m: float
     height_m: float
     raster_x: int
@@ -134,6 +135,7 @@ def process_dem(
     log.debug(f"DEM processed: {width_m:.1f} x {height_m:.1f} CRS units  ({raster_x}×{raster_y} px)")
     return ProcessResult(
         dem_path=output_path,
+        source_dem_path=reprojected_path,  # real elevation values in metres
         width_m=width_m,
         height_m=height_m,
         raster_x=raster_x,
