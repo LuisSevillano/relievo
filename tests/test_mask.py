@@ -221,31 +221,47 @@ def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
 # ---------------------------------------------------------------------------
 
 def _fake_gdaldem(cmd, capture_output, **kwargs):
-    """Simulate gdaldem / gdal_translate subprocess calls."""
-    # gdaldem color-relief: output is cmd[4]
-    # gdal_translate (crop or convert): output is cmd[-1]
-    if cmd[0] == "gdaldem":
-        output_path = cmd[4]
+    """Simulate gdalwarp / gdaldem / gdal_translate subprocess calls."""
+    output_path = cmd[-1]
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+
+    if cmd[0] == "gdalwarp":
+        # warp/crop step → write a Float32 TIFF at the requested size
+        # Parse -ts render_w render_h from cmd if present
+        try:
+            ts_idx = cmd.index("-ts")
+            out_w, out_h = int(cmd[ts_idx + 1]), int(cmd[ts_idx + 2])
+        except (ValueError, IndexError):
+            out_w, out_h = 10, 10
         driver = gdal.GetDriverByName("GTiff")
-        ds = driver.Create(output_path, 10, 10, 3, gdal.GDT_Byte)
+        ds = driver.Create(output_path, out_w, out_h, 1, gdal.GDT_Float32)
+        ds.GetRasterBand(1).Fill(500)
+        ds.FlushCache()
+        ds = None
+    elif cmd[0] == "gdaldem":
+        # color-relief → write a 3-band RGB TIFF same size as input
+        in_ds = gdal.Open(cmd[3])  # input is cmd[3]
+        out_w = in_ds.RasterXSize if in_ds else 10
+        out_h = in_ds.RasterYSize if in_ds else 10
+        if in_ds:
+            in_ds = None
+        driver = gdal.GetDriverByName("GTiff")
+        ds = driver.Create(output_path, out_w, out_h, 3, gdal.GDT_Byte)
         for i in range(1, 4):
             ds.GetRasterBand(i).Fill(200)
         ds.FlushCache()
         ds = None
     elif cmd[0] == "gdal_translate":
-        output_path = cmd[-1]
-        if output_path.endswith(".png"):
-            from PIL import Image as _Image
-            _Image.new("RGB", (10, 10), (200, 200, 200)).save(output_path, "PNG")
-        else:
-            # crop step: copy input to output as a minimal TIFF
-            driver = gdal.GetDriverByName("GTiff")
-            ds = driver.Create(output_path, 10, 10, 1, gdal.GDT_Float32)
-            ds.GetRasterBand(1).Fill(500)
-            ds.FlushCache()
-            ds = None
-    mock_result = MagicMock()
-    mock_result.returncode = 0
+        # PNG conversion step
+        from PIL import Image as _Image
+        in_ds = gdal.Open(cmd[-2]) if not cmd[-2].endswith(".png") else None
+        out_w = in_ds.RasterXSize if in_ds else 10
+        out_h = in_ds.RasterYSize if in_ds else 10
+        if in_ds:
+            in_ds = None
+        _Image.new("RGB", (out_w, out_h), (200, 200, 200)).save(output_path, "PNG")
+
     return mock_result
 
 
@@ -272,14 +288,11 @@ def test_color_relief_output_size_matches_render(mock_run, tmp_path, synthetic_p
 
 @patch("blender_relief.mask.subprocess.run")
 def test_color_relief_gdaldem_failure_raises(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
-    """If gdal_translate (crop) succeeds but gdaldem fails, RuntimeError is raised."""
-    call_count = [0]
-
+    """If gdalwarp succeeds but gdaldem fails, RuntimeError is raised."""
     def side_effect(cmd, capture_output=False, **kwargs):
-        call_count[0] += 1
         mock_result = MagicMock()
-        if cmd[0] == "gdal_translate" and call_count[0] == 1:
-            # First call is the crop step — succeed and create output file
+        if cmd[0] == "gdalwarp":
+            # crop step succeeds, write output TIFF
             output_path = cmd[-1]
             driver = gdal.GetDriverByName("GTiff")
             ds = driver.Create(output_path, 10, 10, 1, gdal.GDT_Float32)

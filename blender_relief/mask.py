@@ -194,38 +194,79 @@ def apply_color_relief(
     if not _GDAL_AVAILABLE:
         raise ImportError("GDAL is required for --color-relief. Install via conda-forge.")
 
-    # Read the exact geographic extent from dem_blender_path
+    # -----------------------------------------------------------------------
+    # Compute the geographic extent that Blender actually rendered.
+    #
+    # Blender uses an ortho camera with ortho_scale = plane_y = dem_h / 1000
+    # units, which covers the full DEM height vertically. The horizontal
+    # coverage depends on the render aspect ratio:
+    #
+    #   rendered_width_geo = dem_height_geo * (render_w / render_h)
+    #
+    # This may be narrower or wider than the DEM width. We use this extent to
+    # crop the source DEM so gdaldem produces colours aligned pixel-perfectly
+    # with the render.
+    # -----------------------------------------------------------------------
     ds = gdal.Open(dem_blender_path)
     if ds is None:
-        raise RuntimeError(f"Cannot open DEM for extent: {dem_blender_path}")
-    gt = ds.GetGeoTransform()
-    w, h = ds.RasterXSize, ds.RasterYSize
-    west  = gt[0]
-    north = gt[3]
-    east  = gt[0] + gt[1] * w
-    south = gt[3] + gt[5] * h
-    ds = None
+        raise RuntimeError(f"Cannot open DEM: {dem_blender_path}")
+    gt     = ds.GetGeoTransform()
+    dem_w  = ds.RasterXSize
+    dem_h  = ds.RasterYSize
+    ds     = None
+
+    pixel_x = gt[1]           # positive
+    pixel_y = abs(gt[5])      # positive
+
+    # DEM geographic extent
+    dem_west  = gt[0]
+    dem_north = gt[3]
+    dem_east  = dem_west  + pixel_x * dem_w
+    dem_south = dem_north - pixel_y * dem_h
+    dem_cx    = (dem_west + dem_east) / 2   # geographic centre
+
+    # Render pixel dimensions
+    render_img = Image.open(render_png)
+    render_w, render_h = render_img.size
+
+    # Geographic width covered by the render:
+    #   dem_height_geo * render_aspect = pixel_y * dem_h * render_w / render_h
+    rendered_geo_width = pixel_y * dem_h * render_w / render_h
+
+    render_west  = dem_cx - rendered_geo_width / 2
+    render_east  = dem_cx + rendered_geo_width / 2
+    render_north = dem_north
+    render_south = dem_south
+
+    log.debug(
+        f"Render extent (geo): W={render_west:.6f} E={render_east:.6f} "
+        f"N={render_north:.6f} S={render_south:.6f}"
+    )
 
     with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
         cropped_tif = str(pathlib.Path(tmpdir) / "dem_cropped.tif")
         color_tif   = str(pathlib.Path(tmpdir) / "color_relief.tif")
         color_png   = str(pathlib.Path(tmpdir) / "color_relief.png")
 
-        # Step 1: crop source DEM to the exact same extent as dem_blender_path
-        # so the color relief aligns pixel-perfectly with the render.
+        # Step 1: crop source DEM to the exact geographic extent of the render,
+        # resampled to the exact render pixel dimensions so no further
+        # rescaling is needed.
         cmd_crop = [
-            "gdal_translate",
-            "-projWin", str(west), str(north), str(east), str(south),
+            "gdalwarp",
+            "-te", str(render_west), str(render_south),
+                   str(render_east), str(render_north),
+            "-ts", str(render_w), str(render_h),
+            "-r",  "bilinear",
             dem_path, cropped_tif,
         ]
-        log.debug(f"Cropping DEM to render extent: {' '.join(cmd_crop)}")
+        log.debug(f"Warping DEM to render grid: {' '.join(cmd_crop)}")
         proc = subprocess.run(cmd_crop, capture_output=True)
         if proc.returncode != 0:
             raise RuntimeError(
-                f"gdal_translate (crop) failed:\n{proc.stderr.decode(errors='replace')}"
+                f"gdalwarp (crop) failed:\n{proc.stderr.decode(errors='replace')}"
             )
 
-        # Step 2: generate color relief as RGB GeoTIFF
+        # Step 2: generate color relief as RGB GeoTIFF at render pixel size
         cmd = ["gdaldem", "color-relief", cropped_tif, color_ramp, color_tif]
         log.debug(f"Running: {' '.join(cmd)}")
         proc = subprocess.run(cmd, capture_output=True)
@@ -234,17 +275,14 @@ def apply_color_relief(
                 f"gdaldem color-relief failed:\n{proc.stderr.decode(errors='replace')}"
             )
 
-        # Step 3: convert GeoTIFF → PNG so Pillow can read it reliably
+        # Step 3: convert GeoTIFF → PNG so Pillow reads it reliably
         cmd2 = ["gdal_translate", "-of", "PNG", color_tif, color_png]
         subprocess.run(cmd2, capture_output=True, check=True)
 
-        # Step 4: resize color relief to render pixel dimensions and multiply-blend
+        # Step 4: multiply-blend — no resize needed, already at render size
         render_rgb = _open_as_rgb8(render_png)
-        render_w, render_h = render_rgb.size
-        color_rgb = Image.open(color_png).convert("RGB").resize(
-            (render_w, render_h), Image.LANCZOS
-        )
-        blended = ImageChops.multiply(render_rgb, color_rgb)
+        color_rgb  = Image.open(color_png).convert("RGB")
+        blended    = ImageChops.multiply(render_rgb, color_rgb)
         blended.save(output_path, format="PNG")
 
     log.info(f"Color relief applied  →  {output_path}")
