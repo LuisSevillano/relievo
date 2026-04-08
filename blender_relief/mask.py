@@ -156,25 +156,61 @@ def apply_clip_mask(
     log.info(f"Clip mask applied  →  {output_path}")
 
 
+def _rescale_ramp(ramp_path: str, src_min: float, src_max: float, out_path: str) -> None:
+    """Write a new gdaldem color ramp file with elevations rescaled to UInt16 (0–65535).
+
+    ``dem_blender.tif`` stores rescaled values where:
+        uint16 = (elev - src_min) / (src_max - src_min) * 65535
+
+    This function rewrites the ramp so the elevation breakpoints match the
+    UInt16 pixel values in ``dem_blender.tif``.
+
+    Lines starting with ``#`` are preserved as comments. The special ``nv``
+    (no-data) entry is also preserved verbatim.
+    """
+    scale = src_max - src_min if (src_max - src_min) != 0 else 1.0
+    lines_out = []
+    with open(ramp_path) as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                lines_out.append(line)
+                continue
+            parts = stripped.split()
+            if parts[0].lower() == "nv":
+                lines_out.append(line)
+                continue
+            try:
+                elev = float(parts[0])
+            except ValueError:
+                lines_out.append(line)
+                continue
+            uint16_val = (elev - src_min) / scale * 65535.0
+            uint16_val = max(0.0, min(65535.0, uint16_val))
+            rest = " ".join(parts[1:])
+            lines_out.append(f"{uint16_val:.2f} {rest}\n")
+    with open(out_path, "w") as f:
+        f.writelines(lines_out)
+
+
 def apply_color_relief(
     render_png: str,
     dem_path: str,
     dem_blender_path: str,
     color_ramp: str,
     output_path: str,
+    src_min: float = 0.0,
+    src_max: float = 65535.0,
+    mode: str = "overlay",
 ) -> None:
-    """Composite a hypsometric color tint over the rendered shaded relief.
+    """Genera un tint hipsométrico a partir de dem_blender.tif y lo combina con el render.
 
-    Runs ``gdaldem color-relief`` on the source DEM (real elevation values in
-    metres), resizes the result to match the render dimensions, and blends it
-    with the render using multiply mode.
+    Ejecuta ``gdaldem color-relief`` sobre ``dem_blender_path`` (el raster
+    exacto que Blender ha desplazado) usando un ramp reescalado a UInt16.
+    El resultado se redimensiona al tamaño del render y se combina según ``mode``.
 
-    The source DEM may have a larger extent than the render (e.g. download
-    buffer). ``dem_blender_path`` is used as the reference to crop the source
-    DEM to the exact same geographic extent before running gdaldem, ensuring
-    pixel-perfect alignment.
-
-    The color ramp file follows the standard ``gdaldem color-relief`` format::
+    El fichero de ramp usa elevaciones en metros (formato estándar gdaldem).
+    Se reescalan automáticamente a UInt16 usando ``src_min`` / ``src_max``::
 
         # elevation_m  R   G   B
         0              70  130 180
@@ -184,105 +220,98 @@ def apply_color_relief(
         nv             0   0   0
 
     Args:
-        render_png: Path to the rendered PNG produced by Blender.
-        dem_path: Source DEM with real elevation values in metres.
-        dem_blender_path: UInt16-rescaled DEM (same extent as render). Used
-            only to read the geographic extent for cropping dem_path.
-        color_ramp: Path to a gdaldem color ramp text file.
-        output_path: Destination path for the composited PNG.
+        render_png: Ruta al PNG renderizado por Blender.
+        dem_path: No usado (compatibilidad). Puede pasarse ``""`` o cualquier valor.
+        dem_blender_path: DEM reescalado a UInt16 (dem_blender.tif).
+        color_ramp: Ruta al fichero de ramp de gdaldem (elevaciones en m).
+        output_path: Ruta de salida para el PNG combinado.
+        src_min: Elevación mínima (m) usada al reescalar a UInt16.
+        src_max: Elevación máxima (m) usada al reescalar a UInt16.
+        mode: ``"overlay"`` — sobreescribe render_png con el resultado combinado;
+              ``"separate"`` — guarda sólo el color sin combinar en output_path;
+              ``"both"`` — guarda el combinado en output_path y el color puro
+              en ``<output_path_sin_ext>_color.<ext>``.
     """
     if not _GDAL_AVAILABLE:
         raise ImportError("GDAL is required for --color-relief. Install via conda-forge.")
 
     # -----------------------------------------------------------------------
-    # Compute the geographic extent that Blender actually rendered.
+    # La cámara de Blender usa ortho_scale = plane_y = raster_y / 1000.
+    # En Blender, ortho_scale es la ALTURA del área visible. Por tanto:
+    #   - Filas visibles : todas (raster_y, altura completa del DEM)
+    #   - Columnas visibles: raster_y * render_w / render_h  (centro del DEM)
     #
-    # Blender uses an ortho camera with ortho_scale = plane_y = dem_h / 1000
-    # units, which covers the full DEM height vertically. The horizontal
-    # coverage depends on the render aspect ratio:
+    # Cuando render_w/render_h == raster_x/raster_y (p.ej. con --max-size):
+    #   cols_visibles == raster_x → crop nulo, resize 1:1 sin distorsión.
     #
-    #   rendered_width_geo = dem_height_geo * (render_w / render_h)
-    #
-    # This may be narrower or wider than the DEM width. We use this extent to
-    # crop the source DEM so gdaldem produces colours aligned pixel-perfectly
-    # with the render.
+    # Cuando la resolución del template tiene un aspect ratio diferente al DEM:
+    #   se recortan las columnas centrales antes de redimensionar.
     # -----------------------------------------------------------------------
-    ds = gdal.Open(dem_blender_path)
-    if ds is None:
-        raise RuntimeError(f"Cannot open DEM: {dem_blender_path}")
-    gt     = ds.GetGeoTransform()
-    dem_w  = ds.RasterXSize
-    dem_h  = ds.RasterYSize
-    ds     = None
-
-    pixel_x = gt[1]           # positive
-    pixel_y = abs(gt[5])      # positive
-
-    # DEM geographic extent
-    dem_west  = gt[0]
-    dem_north = gt[3]
-    dem_east  = dem_west  + pixel_x * dem_w
-    dem_south = dem_north - pixel_y * dem_h
-    dem_cx    = (dem_west + dem_east) / 2   # geographic centre
-
-    # Render pixel dimensions
     render_img = Image.open(render_png)
     render_w, render_h = render_img.size
 
-    # Geographic width covered by the render:
-    #   dem_height_geo * render_aspect = pixel_y * dem_h * render_w / render_h
-    rendered_geo_width = pixel_y * dem_h * render_w / render_h
+    ds = gdal.Open(dem_blender_path)
+    if ds is None:
+        raise RuntimeError(f"No se puede abrir el DEM: {dem_blender_path}")
+    dem_w = ds.RasterXSize   # == raster_x pasado a Blender
+    dem_h = ds.RasterYSize   # == raster_y pasado a Blender
+    ds = None
 
-    render_west  = dem_cx - rendered_geo_width / 2
-    render_east  = dem_cx + rendered_geo_width / 2
-    render_north = dem_north
-    render_south = dem_south
+    # Columnas del DEM que cubre el render (puede ser < dem_w, == dem_w o > dem_w)
+    cols_visibles = dem_h * render_w / render_h
+    # Recorte centrado (si cols_visibles > dem_w no hay nada que recortar)
+    x0 = max(0, int(round((dem_w - cols_visibles) / 2.0)))
+    x1 = min(dem_w, x0 + int(round(cols_visibles)))
 
     log.debug(
-        f"Render extent (geo): W={render_west:.6f} E={render_east:.6f} "
-        f"N={render_north:.6f} S={render_south:.6f}"
+        f"DEM {dem_w}×{dem_h} px | render {render_w}×{render_h} px | "
+        f"cols visibles {cols_visibles:.1f} | crop x [{x0}:{x1}]"
     )
 
     with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
-        cropped_tif = str(pathlib.Path(tmpdir) / "dem_cropped.tif")
-        color_tif   = str(pathlib.Path(tmpdir) / "color_relief.tif")
-        color_png   = str(pathlib.Path(tmpdir) / "color_relief.png")
+        rescaled_ramp = str(pathlib.Path(tmpdir) / "ramp_uint16.txt")
+        color_tif     = str(pathlib.Path(tmpdir) / "color_relief.tif")
+        color_png_tmp = str(pathlib.Path(tmpdir) / "color_relief.png")
 
-        # Step 1: crop source DEM to the exact geographic extent of the render,
-        # resampled to the exact render pixel dimensions so no further
-        # rescaling is needed.
-        cmd_crop = [
-            "gdalwarp",
-            "-te", str(render_west), str(render_south),
-                   str(render_east), str(render_north),
-            "-ts", str(render_w), str(render_h),
-            "-r",  "bilinear",
-            dem_path, cropped_tif,
-        ]
-        log.debug(f"Warping DEM to render grid: {' '.join(cmd_crop)}")
-        proc = subprocess.run(cmd_crop, capture_output=True)
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"gdalwarp (crop) failed:\n{proc.stderr.decode(errors='replace')}"
-            )
+        # 1. Reescribir el ramp de metros a valores UInt16 del dem_blender.tif
+        _rescale_ramp(color_ramp, src_min, src_max, rescaled_ramp)
 
-        # Step 2: generate color relief as RGB GeoTIFF at render pixel size
-        cmd = ["gdaldem", "color-relief", cropped_tif, color_ramp, color_tif]
-        log.debug(f"Running: {' '.join(cmd)}")
+        # 2. Generar color sobre dem_blender.tif: mismo grid exacto que usa Blender
+        cmd = ["gdaldem", "color-relief", dem_blender_path, rescaled_ramp, color_tif]
+        log.debug(f"Ejecutando: {' '.join(cmd)}")
         proc = subprocess.run(cmd, capture_output=True)
         if proc.returncode != 0:
             raise RuntimeError(
                 f"gdaldem color-relief failed:\n{proc.stderr.decode(errors='replace')}"
             )
 
-        # Step 3: convert GeoTIFF → PNG so Pillow reads it reliably
-        cmd2 = ["gdal_translate", "-of", "PNG", color_tif, color_png]
-        subprocess.run(cmd2, capture_output=True, check=True)
+        # 3. GeoTIFF → PNG (Pillow no lee bien los canales alpha de GDAL GeoTIFF)
+        subprocess.run(
+            ["gdal_translate", "-of", "PNG", color_tif, color_png_tmp],
+            capture_output=True, check=True,
+        )
 
-        # Step 4: multiply-blend — no resize needed, already at render size
-        render_rgb = _open_as_rgb8(render_png)
-        color_rgb  = Image.open(color_png).convert("RGB")
-        blended    = ImageChops.multiply(render_rgb, color_rgb)
-        blended.save(output_path, format="PNG")
+        # 4. Recortar columnas centrales y redimensionar al tamaño del render
+        #    El recorte preserva el aspect ratio del render → resize sin distorsión
+        color_full = Image.open(color_png_tmp).convert("RGB")
+        color_cropped = color_full.crop((x0, 0, x1, dem_h))
+        color_final = color_cropped.resize((render_w, render_h), Image.LANCZOS)
 
-    log.info(f"Color relief applied  →  {output_path}")
+        # 5. Guardar según el modo
+        out_path = pathlib.Path(output_path)
+        separate_path = str(out_path.with_name(out_path.stem + "_color" + out_path.suffix))
+
+        if mode == "separate":
+            # El render queda intacto en output_path; el color se guarda aparte
+            color_final.save(separate_path, format="PNG")
+            log.info(f"Color relief guardado  →  {separate_path}")
+        elif mode == "both":
+            color_final.save(separate_path, format="PNG")
+            log.info(f"Color relief guardado  →  {separate_path}")
+            blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
+            blended.save(output_path, format="PNG")
+            log.info(f"Color relief aplicado  →  {output_path}")
+        else:  # overlay (por defecto)
+            blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
+            blended.save(output_path, format="PNG")
+            log.info(f"Color relief aplicado  →  {output_path}")

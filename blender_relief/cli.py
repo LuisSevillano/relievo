@@ -149,8 +149,18 @@ def _find_blender(blender_bin: str) -> str:
 )
 @click.option(
     "--color-relief", "color_ramp", type=click.Path(exists=True), default=None,
-    help="Path to a gdaldem color ramp file. Composites a hypsometric color tint over the rendered PNG "
-         "using multiply blending. Requires gdaldem on PATH.",
+    help="Ruta a un fichero de ramp de gdaldem. Aplica un tint hipsométrico sobre el render. Requiere gdaldem en PATH.",
+)
+@click.option(
+    "--color-relief-mode", "color_relief_mode",
+    type=click.Choice(["overlay", "separate", "both"], case_sensitive=False),
+    default="overlay", show_default=True,
+    help=(
+        "Modo de salida del color relief. "
+        "'overlay' combina el tint sobre el render (por defecto). "
+        "'separate' guarda sólo el PNG de color (sin combinar). "
+        "'both' guarda los dos: el combinado en --output y el color puro en <output>_color.png."
+    ),
 )
 @click.option(
     "--clip-mask", is_flag=True, default=False,
@@ -181,7 +191,7 @@ def _find_blender(blender_bin: str) -> str:
 def main(
     bbox, template, output, buffer, dem, save_dem, crs, demtype, api_key,
     exaggeration, samples, max_size, scale,
-    light_azimuth, light_altitude, color_ramp, clip_mask,
+    light_azimuth, light_altitude, color_ramp, color_relief_mode, clip_mask,
     dry_run, no_render,
     verbose, blender_bin, keep_workdir,
 ):
@@ -206,7 +216,7 @@ def main(
     if dry_run:
         _print_dry_run(bbox_abs, dem, demtype, crs, buffer, output_abs,
                        max_size, scale, light_azimuth, light_altitude,
-                       color_ramp, clip_mask, no_render)
+                       color_ramp, color_relief_mode, clip_mask, no_render)
         return
 
     # Validate blender early (skip for --no-render)
@@ -296,7 +306,12 @@ def main(
             log.info("Applying color relief...")
             # Use source_dem_path (real elevation values in metres), not the
             # UInt16-rescaled dem_blender.tif, so the ramp elevations match.
-            apply_color_relief(output_abs, result.source_dem_path, result.dem_path, color_ramp_abs, output_abs)
+            apply_color_relief(
+                output_abs, result.source_dem_path, result.dem_path,
+                color_ramp_abs, output_abs,
+                src_min=result.src_min, src_max=result.src_max,
+                mode=color_relief_mode,
+            )
 
         if clip_mask:
             from .mask import apply_clip_mask
@@ -318,7 +333,7 @@ def main(
 def _print_dry_run(
     bbox_abs, dem, demtype, crs, buffer, output_abs,
     max_size, scale, light_azimuth, light_altitude,
-    color_ramp, clip_mask, no_render,
+    color_ramp, color_relief_mode, clip_mask, no_render,
 ):
     """Print a summary of what would happen, then exit."""
     from .download import estimate_pixels, extract_wgs84_bbox, buffer_bbox, DEM_DATASETS
@@ -355,7 +370,7 @@ def _print_dry_run(
         click.echo(f"  Sun:               azimuth={light_azimuth}°  altitude={light_altitude}°")
 
     if color_ramp:
-        click.echo(f"  Color relief:      {color_ramp}")
+        click.echo(f"  Color relief:      {color_ramp}  (mode: {color_relief_mode})")
     if clip_mask:
         click.echo(f"  Clip mask:         enabled")
     if no_render:

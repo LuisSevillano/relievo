@@ -36,11 +36,13 @@ def _require_gdal():
 @dataclass
 class ProcessResult:
     dem_path: str        # UInt16 rescaled DEM for Blender
-    source_dem_path: str # DEM with real elevation values in metres (for color-relief)
+    source_dem_path: str # DEM with real elevation values in metres
     width_m: float
     height_m: float
     raster_x: int
     raster_y: int
+    src_min: float = 0.0   # minimum elevation (metres) used for UInt16 scaling
+    src_max: float = 0.0   # maximum elevation (metres) used for UInt16 scaling
 
 
 def reproject_bbox(
@@ -140,4 +142,6 @@ def process_dem(
         height_m=height_m,
         raster_x=raster_x,
         raster_y=raster_y,
+        src_min=src_min,
+        src_max=src_max,
     )

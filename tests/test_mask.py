@@ -220,27 +220,14 @@ def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
 # apply_color_relief (mocked gdaldem)
 # ---------------------------------------------------------------------------
 
-def _fake_gdaldem(cmd, capture_output, **kwargs):
-    """Simulate gdalwarp / gdaldem / gdal_translate subprocess calls."""
+def _fake_gdaldem(cmd, capture_output=False, **kwargs):
+    """Simulate gdaldem / gdal_translate subprocess calls."""
     output_path = cmd[-1]
     mock_result = MagicMock()
     mock_result.returncode = 0
 
-    if cmd[0] == "gdalwarp":
-        # warp/crop step → write a Float32 TIFF at the requested size
-        # Parse -ts render_w render_h from cmd if present
-        try:
-            ts_idx = cmd.index("-ts")
-            out_w, out_h = int(cmd[ts_idx + 1]), int(cmd[ts_idx + 2])
-        except (ValueError, IndexError):
-            out_w, out_h = 10, 10
-        driver = gdal.GetDriverByName("GTiff")
-        ds = driver.Create(output_path, out_w, out_h, 1, gdal.GDT_Float32)
-        ds.GetRasterBand(1).Fill(500)
-        ds.FlushCache()
-        ds = None
-    elif cmd[0] == "gdaldem":
-        # color-relief → write a 3-band RGB TIFF same size as input
+    if cmd[0] == "gdaldem":
+        # color-relief → write a 3-band RGB TIFF same size as input DEM
         in_ds = gdal.Open(cmd[3])  # input is cmd[3]
         out_w = in_ds.RasterXSize if in_ds else 10
         out_h = in_ds.RasterYSize if in_ds else 10
@@ -267,9 +254,10 @@ def _fake_gdaldem(cmd, capture_output, **kwargs):
 
 @patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
 def test_color_relief_produces_file(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
-    """apply_color_relief should create the output PNG."""
+    """apply_color_relief debe crear el PNG de salida."""
     output = str(tmp_path / "colored.png")
-    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output)
+    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
+                       src_min=0.0, src_max=3000.0)
     import os
     assert os.path.isfile(output)
     img = Image.open(output)
@@ -278,34 +266,49 @@ def test_color_relief_produces_file(mock_run, tmp_path, synthetic_png, synthetic
 
 @patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
 def test_color_relief_output_size_matches_render(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
-    """Output image dimensions must match the input render PNG."""
+    """El PNG de salida debe tener las mismas dimensiones que el render."""
     output = str(tmp_path / "colored.png")
     render_w, render_h = Image.open(synthetic_png).size
-    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output)
+    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
+                       src_min=0.0, src_max=3000.0)
     out_w, out_h = Image.open(output).size
     assert (out_w, out_h) == (render_w, render_h)
 
 
+@patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
+def test_color_relief_mode_separate(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
+    """mode='separate' guarda el PNG de color puro (sin combinar con el render)."""
+    output = str(tmp_path / "colored.png")
+    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
+                       src_min=0.0, src_max=3000.0, mode="separate")
+    import os
+    assert os.path.isfile(output)
+    img = Image.open(output)
+    assert img.mode == "RGB"
+
+
+@patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
+def test_color_relief_mode_both(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
+    """mode='both' genera el PNG combinado y el PNG de color por separado."""
+    import os
+    output = str(tmp_path / "colored.png")
+    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
+                       src_min=0.0, src_max=3000.0, mode="both")
+    assert os.path.isfile(output)
+    color_only = str(tmp_path / "colored_color.png")
+    assert os.path.isfile(color_only)
+
+
 @patch("blender_relief.mask.subprocess.run")
 def test_color_relief_gdaldem_failure_raises(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
-    """If gdalwarp succeeds but gdaldem fails, RuntimeError is raised."""
+    """Si gdaldem falla, debe lanzar RuntimeError."""
     def side_effect(cmd, capture_output=False, **kwargs):
         mock_result = MagicMock()
-        if cmd[0] == "gdalwarp":
-            # crop step succeeds, write output TIFF
-            output_path = cmd[-1]
-            driver = gdal.GetDriverByName("GTiff")
-            ds = driver.Create(output_path, 10, 10, 1, gdal.GDT_Float32)
-            ds.GetRasterBand(1).Fill(500)
-            ds.FlushCache()
-            ds = None
-            mock_result.returncode = 0
-        else:
-            mock_result.returncode = 1
-            mock_result.stderr = b"gdaldem: error"
+        mock_result.returncode = 1
+        mock_result.stderr = b"gdaldem: error"
         return mock_result
 
     mock_run.side_effect = side_effect
     with pytest.raises(RuntimeError, match="gdaldem color-relief failed"):
         apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file,
-                           str(tmp_path / "out.png"))
+                           str(tmp_path / "out.png"), src_min=0.0, src_max=3000.0)

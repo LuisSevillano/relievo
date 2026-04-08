@@ -119,6 +119,10 @@ def main() -> None:
 
     if scene.camera:
         scene.camera.data.ortho_scale = plane_y
+        # Forzar VERTICAL para que ortho_scale sea siempre la altura visible,
+        # independientemente de si el render es landscape o portrait.
+        # Con AUTO, Blender cambia el eje según el aspect ratio del render.
+        scene.camera.data.sensor_fit = 'VERTICAL'
 
     if args.exaggeration is not None:
         for node in mat.node_tree.nodes:
