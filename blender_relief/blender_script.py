@@ -118,11 +118,25 @@ def main() -> None:
     scene.render.resolution_percentage = args.scale
 
     if scene.camera:
-        scene.camera.data.ortho_scale = plane_y
-        # Forzar VERTICAL para que ortho_scale sea siempre la altura visible,
-        # independientemente de si el render es landscape o portrait.
-        # Con AUTO, Blender cambia el eje según el aspect ratio del render.
+        # Forzar VERTICAL: ortho_scale = altura visible siempre.
         scene.camera.data.sensor_fit = 'VERTICAL'
+
+        render_aspect = scene.render.resolution_x / scene.render.resolution_y
+        dem_aspect    = plane_x / plane_y
+
+        if dem_aspect > render_aspect:
+            # DEM más ancho que el render → escalar para ver todo el ancho;
+            # habrá bandas negras arriba y abajo.
+            ortho_scale = plane_x / render_aspect
+        else:
+            # DEM más alto (o cuadrado) → mostrar altura completa.
+            ortho_scale = plane_y
+
+        scene.camera.data.ortho_scale = ortho_scale
+        print(
+            f"Camera: ortho_scale={ortho_scale:.4f}  "
+            f"dem_aspect={dem_aspect:.3f}  render_aspect={render_aspect:.3f}"
+        )
 
     if args.exaggeration is not None:
         for node in mat.node_tree.nodes:

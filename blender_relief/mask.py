@@ -236,16 +236,21 @@ def apply_color_relief(
         raise ImportError("GDAL is required for --color-relief. Install via conda-forge.")
 
     # -----------------------------------------------------------------------
-    # La cámara de Blender usa ortho_scale = plane_y = raster_y / 1000.
-    # En Blender, ortho_scale es la ALTURA del área visible. Por tanto:
-    #   - Filas visibles : todas (raster_y, altura completa del DEM)
-    #   - Columnas visibles: raster_y * render_w / render_h  (centro del DEM)
+    # Replicamos exactamente la lógica de blender_script.py para saber qué
+    # región del DEM ve la cámara (sensor_fit='VERTICAL' siempre):
     #
-    # Cuando render_w/render_h == raster_x/raster_y (p.ej. con --max-size):
-    #   cols_visibles == raster_x → crop nulo, resize 1:1 sin distorsión.
+    #   ortho_scale = altura visible en unidades Blender
+    #   visible_width_BU = ortho_scale * render_w / render_h
     #
-    # Cuando la resolución del template tiene un aspect ratio diferente al DEM:
-    #   se recortan las columnas centrales antes de redimensionar.
+    # Dos casos según el aspect ratio del DEM vs el del render:
+    #
+    #   DEM más ancho (dem_w/dem_h > render_w/render_h):
+    #     ortho_scale = plane_x / render_aspect  → muestra todo el ancho del DEM
+    #     color: DEM completo en X, centrado verticalmente con bandas negras
+    #
+    #   DEM más alto o cuadrado:
+    #     ortho_scale = plane_y  → muestra toda la altura del DEM
+    #     color: todas las filas, recorte de columnas centrales en X
     # -----------------------------------------------------------------------
     render_img = Image.open(render_png)
     render_w, render_h = render_img.size
@@ -253,20 +258,12 @@ def apply_color_relief(
     ds = gdal.Open(dem_blender_path)
     if ds is None:
         raise RuntimeError(f"No se puede abrir el DEM: {dem_blender_path}")
-    dem_w = ds.RasterXSize   # == raster_x pasado a Blender
-    dem_h = ds.RasterYSize   # == raster_y pasado a Blender
+    dem_w = ds.RasterXSize
+    dem_h = ds.RasterYSize
     ds = None
 
-    # Columnas del DEM que cubre el render (puede ser < dem_w, == dem_w o > dem_w)
-    cols_visibles = dem_h * render_w / render_h
-    # Recorte centrado (si cols_visibles > dem_w no hay nada que recortar)
-    x0 = max(0, int(round((dem_w - cols_visibles) / 2.0)))
-    x1 = min(dem_w, x0 + int(round(cols_visibles)))
-
-    log.debug(
-        f"DEM {dem_w}×{dem_h} px | render {render_w}×{render_h} px | "
-        f"cols visibles {cols_visibles:.1f} | crop x [{x0}:{x1}]"
-    )
+    render_aspect = render_w / render_h
+    dem_aspect    = dem_w / dem_h
 
     with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
         rescaled_ramp = str(pathlib.Path(tmpdir) / "ramp_uint16.txt")
@@ -276,7 +273,7 @@ def apply_color_relief(
         # 1. Reescribir el ramp de metros a valores UInt16 del dem_blender.tif
         _rescale_ramp(color_ramp, src_min, src_max, rescaled_ramp)
 
-        # 2. Generar color sobre dem_blender.tif: mismo grid exacto que usa Blender
+        # 2. Generar color sobre dem_blender.tif (mismo grid que usa Blender)
         cmd = ["gdaldem", "color-relief", dem_blender_path, rescaled_ramp, color_tif]
         log.debug(f"Ejecutando: {' '.join(cmd)}")
         proc = subprocess.run(cmd, capture_output=True)
@@ -291,18 +288,39 @@ def apply_color_relief(
             capture_output=True, check=True,
         )
 
-        # 4. Recortar columnas centrales y redimensionar al tamaño del render
-        #    El recorte preserva el aspect ratio del render → resize sin distorsión
         color_full = Image.open(color_png_tmp).convert("RGB")
-        color_cropped = color_full.crop((x0, 0, x1, dem_h))
-        color_final = color_cropped.resize((render_w, render_h), Image.LANCZOS)
 
-        # 5. Guardar según el modo
+        if dem_aspect > render_aspect:
+            # DEM más ancho: la cámara ve todo el ancho y tiene bandas negras
+            # arriba y abajo. El color cubre todo dem_w columnas y dem_h filas,
+            # pero solo ocupa render_h * (dem_h/dem_w * render_aspect) píxeles.
+            vis_h_px = int(round(render_h * (dem_h / dem_w) * render_aspect))
+            color_resized = color_full.resize((render_w, vis_h_px), Image.LANCZOS)
+            # Centrar verticalmente sobre fondo negro
+            color_final = Image.new("RGB", (render_w, render_h), (0, 0, 0))
+            y_off = (render_h - vis_h_px) // 2
+            color_final.paste(color_resized, (0, y_off))
+            log.debug(
+                f"DEM {dem_w}×{dem_h} | render {render_w}×{render_h} | "
+                f"DEM ancho: color→{render_w}×{vis_h_px} centrado en y={y_off}"
+            )
+        else:
+            # DEM más alto: recorte de columnas centrales
+            vis_w_px = int(round(dem_h * render_aspect))
+            x0 = max(0, (dem_w - vis_w_px) // 2)
+            x1 = min(dem_w, x0 + vis_w_px)
+            color_cropped = color_full.crop((x0, 0, x1, dem_h))
+            color_final = color_cropped.resize((render_w, render_h), Image.LANCZOS)
+            log.debug(
+                f"DEM {dem_w}×{dem_h} | render {render_w}×{render_h} | "
+                f"DEM alto: crop x [{x0}:{x1}]→{render_w}×{render_h}"
+            )
+
+        # 4. Guardar según el modo
         out_path = pathlib.Path(output_path)
         separate_path = str(out_path.with_name(out_path.stem + "_color" + out_path.suffix))
 
         if mode == "separate":
-            # El render queda intacto en output_path; el color se guarda aparte
             color_final.save(separate_path, format="PNG")
             log.info(f"Color relief guardado  →  {separate_path}")
         elif mode == "both":
@@ -311,7 +329,7 @@ def apply_color_relief(
             blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
             blended.save(output_path, format="PNG")
             log.info(f"Color relief aplicado  →  {output_path}")
-        else:  # overlay (por defecto)
+        else:  # overlay
             blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
             blended.save(output_path, format="PNG")
             log.info(f"Color relief aplicado  →  {output_path}")
