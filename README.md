@@ -4,6 +4,8 @@
 
 `blender-relief` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode both` to get the composite *and* the raw colour layer — all scriptable, all reproducible.
 
+> **Inspired by** [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin — which pioneered bringing the OpenTopography API directly into a geospatial workflow.
+
 | Shaded relief | + hypsometric tint |
 |---|---|
 | ![Tenerife shaded relief](docs/images/tenerife_relief.png) | ![Tenerife with colour tint](docs/images/tenerife_relief_color.png) |
@@ -166,6 +168,77 @@ Options:
   --keep-workdir               Keep the temporary working directory after render.
   --help                       Show this message and exit.
 ```
+
+---
+
+## Gallery
+
+All examples below use **`examples/tenerife_bbox.geojson`** and **`dem.tif`** (pre-downloaded) as input. No API key required.
+
+---
+
+### Shaded relief only
+
+```bash
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem dem.tif \
+  --output relieve.png
+```
+
+![Shaded relief](docs/images/tenerife_relief.png)
+
+---
+
+### + Hypsometric tint (`--color-relief-mode overlay`)
+
+```bash
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem dem.tif \
+  --output relieve.png \
+  --color-relief examples/ramp_terrain.txt
+```
+
+![Overlay](docs/images/tenerife_relief_color.png)
+
+---
+
+### Light from the NW vs south
+
+```bash
+# NW light — cartographic convention
+blender-relief ... --light-azimuth 315 --light-altitude 35
+
+# South light — dramatic, reveals north-facing slopes
+blender-relief ... --light-azimuth 180 --light-altitude 18
+```
+
+| NW (315°, 35°) | South (180°, 18°) |
+|---|---|
+| ![NW light](docs/images/ex_light_nw.png) | ![South light](docs/images/ex_light_south.png) |
+
+---
+
+### `--color-relief-mode both` — composite + raw colour layer
+
+```bash
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem dem.tif \
+  --output relieve.png \
+  --color-relief examples/ramp_terrain.txt \
+  --color-relief-mode both
+# → relieve.png        shaded relief + tint
+# → relieve_color.png  raw colour layer for further compositing
+```
+
+| Composite | Raw colour layer |
+|---|---|
+| ![Composite](docs/images/ex_overlay.png) | ![Colour layer](docs/images/ex_overlay_color.png) |
 
 ---
 
