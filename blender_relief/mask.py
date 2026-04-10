@@ -236,34 +236,13 @@ def apply_color_relief(
         raise ImportError("GDAL is required for --color-relief. Install via conda-forge.")
 
     # -----------------------------------------------------------------------
-    # Replicamos exactamente la lógica de blender_script.py para saber qué
-    # región del DEM ve la cámara (sensor_fit='VERTICAL' siempre):
-    #
-    #   ortho_scale = altura visible en unidades Blender
-    #   visible_width_BU = ortho_scale * render_w / render_h
-    #
-    # Dos casos según el aspect ratio del DEM vs el del render:
-    #
-    #   DEM más ancho (dem_w/dem_h > render_w/render_h):
-    #     ortho_scale = plane_x / render_aspect  → muestra todo el ancho del DEM
-    #     color: DEM completo en X, centrado verticalmente con bandas negras
-    #
-    #   DEM más alto o cuadrado:
-    #     ortho_scale = plane_y  → muestra toda la altura del DEM
-    #     color: todas las filas, recorte de columnas centrales en X
+    # El plano de Blender siempre se escala a plane_y × (plane_y * render_aspect)
+    # para rellenar el frame sin bandas. La textura DEM ocupa UV 0-1 sobre
+    # ese plano, igual que el color image ocupa el DEM completo.
+    # Por tanto: resize directo DEM color → render_w × render_h. Sin crop.
     # -----------------------------------------------------------------------
     render_img = Image.open(render_png)
     render_w, render_h = render_img.size
-
-    ds = gdal.Open(dem_blender_path)
-    if ds is None:
-        raise RuntimeError(f"No se puede abrir el DEM: {dem_blender_path}")
-    dem_w = ds.RasterXSize
-    dem_h = ds.RasterYSize
-    ds = None
-
-    render_aspect = render_w / render_h
-    dem_aspect    = dem_w / dem_h
 
     with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
         rescaled_ramp = str(pathlib.Path(tmpdir) / "ramp_uint16.txt")
@@ -288,33 +267,10 @@ def apply_color_relief(
             capture_output=True, check=True,
         )
 
+        # 4. Resize directo al tamaño del render (sin crop ni padding)
         color_full = Image.open(color_png_tmp).convert("RGB")
-
-        if dem_aspect > render_aspect:
-            # DEM más ancho: la cámara ve todo el ancho y tiene bandas negras
-            # arriba y abajo. El color cubre todo dem_w columnas y dem_h filas,
-            # pero solo ocupa render_h * (dem_h/dem_w * render_aspect) píxeles.
-            vis_h_px = int(round(render_h * (dem_h / dem_w) * render_aspect))
-            color_resized = color_full.resize((render_w, vis_h_px), Image.LANCZOS)
-            # Centrar verticalmente sobre fondo negro
-            color_final = Image.new("RGB", (render_w, render_h), (0, 0, 0))
-            y_off = (render_h - vis_h_px) // 2
-            color_final.paste(color_resized, (0, y_off))
-            log.debug(
-                f"DEM {dem_w}×{dem_h} | render {render_w}×{render_h} | "
-                f"DEM ancho: color→{render_w}×{vis_h_px} centrado en y={y_off}"
-            )
-        else:
-            # DEM más alto: recorte de columnas centrales
-            vis_w_px = int(round(dem_h * render_aspect))
-            x0 = max(0, (dem_w - vis_w_px) // 2)
-            x1 = min(dem_w, x0 + vis_w_px)
-            color_cropped = color_full.crop((x0, 0, x1, dem_h))
-            color_final = color_cropped.resize((render_w, render_h), Image.LANCZOS)
-            log.debug(
-                f"DEM {dem_w}×{dem_h} | render {render_w}×{render_h} | "
-                f"DEM alto: crop x [{x0}:{x1}]→{render_w}×{render_h}"
-            )
+        color_final = color_full.resize((render_w, render_h), Image.LANCZOS)
+        log.debug(f"Color relief: {color_full.size} → {render_w}×{render_h}")
 
         # 4. Guardar según el modo
         out_path = pathlib.Path(output_path)
