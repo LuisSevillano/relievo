@@ -22,3 +22,5 @@ sample_bbox.geojson
 
 # Misc
 execute.sh
+*.tif
+*.tif.aux.xml
