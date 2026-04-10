@@ -1,298 +1,595 @@
 # blender-relief
 
-A CLI tool that automates the creation of shaded relief maps using Blender, following [Daniel Huffman's method](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/). Inspired by [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep).
+**Automated shaded relief maps with Blender — from a bounding box to a publication-ready PNG in one command.**
 
-Given a bounding box, it downloads a DEM, processes it with GDAL, and renders a shaded relief PNG through a Blender template — fully headless.
+`blender-relief` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode both` to get the composite *and* the raw colour layer — all scriptable, all reproducible.
 
-```
-bbox.geojson + template.blend  →  shaded_relief.png
-```
+| Shaded relief | + hypsometric tint |
+|---|---|
+| ![Tenerife shaded relief](docs/images/tenerife_relief.png) | ![Tenerife with colour tint](docs/images/tenerife_relief_color.png) |
+
+---
+
+## Contents
+
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [All options](#all-options)
+- [Workflows and examples](#workflows-and-examples)
+- [Bounding box format](#bounding-box-format)
+- [Creating your own Blender template](#creating-your-own-blender-template)
+- [Colour ramp format](#colour-ramp-format)
+- [Available DEM datasets](#available-dem-datasets)
+- [OpenTopography API key](#opentopography-api-key)
+- [Tips and caveats](#tips-and-caveats)
+
+---
+
+## Features
+
+- **Zero GUI** — Blender runs headlessly; the whole pipeline is a single shell command.
+- **Flexible DEM source** — download automatically from OpenTopography (SRTM 30 m / 90 m, NASADEM, Copernicus 30 m / 90 m, ALOS 30 m…) *or* bring your own GeoTIFF. An API key is only needed for the download step.
+- **Hypsometric tint** — composites a colour-by-elevation layer over the render using multiply blending, with three output modes: `overlay`, `separate`, `both`.
+- **Polygon clipping** — cuts the output to any GeoJSON polygon with full alpha transparency.
+- **Configurable lighting** — override sun azimuth and altitude without touching Blender.
+- **Vertical exaggeration** — dial in the drama.
+- **Resolution control** — `--max-size` and `--scale` for everything from quick 10-second previews to print-quality renders.
+- **TOML config profiles** — keep per-project defaults in a file; no more long commands.
+- **Dry run** — preview the download size and pixel count before committing.
+- **CRS reprojection** — reproject the DEM to any metric CRS before rendering.
+
+---
 
 ## How it works
 
-1. Reads a bounding box from a GeoJSON file (WGS84)
-2. Downloads a DEM from [OpenTopography](https://portal.opentopography.org/) (or uses a local file)
-3. Reprojects, crops, and rescales the DEM to 16-bit unsigned with GDAL
-4. Loads the processed DEM into a Blender `.blend` template, adjusts the plane dimensions and camera, and renders a PNG
-
-## Requirements
-
-- Python ≥ 3.9
-- GDAL Python bindings (`osgeo`)
-- Blender 3.x
-
-### Install dependencies
-
-**With conda (recommended):**
-```bash
-conda env create -f environment.yml
-conda activate blender-relief
+```
+GeoJSON bbox
+     │
+     ▼
+ Download DEM          ← OpenTopography API (optional — only needed without --dem)
+ (or load local)       ← any GeoTIFF with --dem; no API key required
+     │
+     ▼
+ Process DEM           ← reproject (optional), rescale to UInt16 (Blender-compatible)
+     │
+     ▼
+ Blender (headless)    ← loads .blend template, applies DEM as displacement map
+     │
+     ▼
+ Post-processing       ← hypsometric tint (gdaldem), polygon clip (Pillow)
+     │
+     ▼
+ output.png
 ```
 
-**With pip (if GDAL is already installed system-wide, e.g. via Homebrew):**
+The Blender step follows the [Daniel Huffman shaded relief method](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/): the DEM drives a displacement map on a flat plane lit by a sun lamp; an orthographic camera renders the scene from above.
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Dependency | Required for | How to install |
+|---|---|---|
+| Python ≥ 3.9 | core | conda / pyenv |
+| GDAL ≥ 3.6 | DEM processing | **conda-forge only** |
+| Blender ≥ 3.6 | rendering | [blender.org](https://www.blender.org/download/) |
+| `gdaldem` | `--color-relief` | included with GDAL |
+| OpenTopography API key | automatic DEM download | [opentopography.org](https://opentopography.org/developers) — free |
+
+> GDAL must be installed through **conda-forge**. `pip install gdal` is not reliable.
+
+### Conda (recommended)
+
 ```bash
+git clone https://github.com/youruser/blender-cli-relief.git
+cd blender-cli-relief
+
+conda env create -f environment.yml
+conda activate blender-relief
 pip install -e .
 ```
 
-## Preparing your Blender template
-
-The tool expects a `.blend` file set up following Huffman's shaded relief method:
-
-- An object named **`Plane`** in the scene
-- The Plane has a material with nodes enabled
-- The material has an **Image Texture** node whose `Color` output feeds into the displacement chain — this node's image will be replaced with the processed DEM on each run
-- Camera is **orthographic**, pointing straight down
-- Sun lamp, render engine (Cycles), and other settings are pre-configured in the template
-
-The tool automatically adjusts the plane's X/Y scale to match the DEM's aspect ratio, sets the camera's `Orthographic Scale` accordingly, and updates the render resolution to match the DEM pixel dimensions.
-
-## Usage
+### Manual
 
 ```bash
-blender-relief --bbox region.geojson --template relief.blend --output shaded_relief.png
+conda create -n blender-relief -c conda-forge python=3.11 gdal pyproj
+conda activate blender-relief
+pip install -e .
 ```
 
-### Download DEM automatically
+### Verify
+
+```bash
+blender-relief --help
+blender-relief --list-datasets
+```
+
+---
+
+## Quick start
+
+```bash
+export OPENTOPO_API_KEY=your_key_here   # only needed if downloading the DEM automatically
+
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife.png
+```
+
+No API key? Pass your own DEM — no account needed:
 
 ```bash
 blender-relief \
-  --bbox region.geojson \
-  --template relief.blend \
-  --output shaded_relief.png \
-  --api-key YOUR_OPENTOPO_KEY
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem /data/my_dem.tif \
+  --output tenerife.png
 ```
 
-### Use a local DEM
+---
+
+## All options
+
+```
+Usage: blender-relief [OPTIONS]
+
+Options:
+  --config FILE                TOML config file with default option values.
+  --list-datasets              List all available DEM datasets and exit.
+  --bbox FILE                  GeoJSON bounding box polygon in WGS84.  [required]
+  --template FILE              Path to the .blend template file.  [required]
+  --output FILE                Output PNG file path.  [default: output.png]
+  --buffer FLOAT               Buffer added to bbox before downloading (e.g. 0.05 = 5%).
+  --dem FILE                   Local DEM GeoTIFF — skips the download step entirely.
+  --save-dem FILE              Save the processed DEM for later reuse with --dem.
+  --crs TEXT                   Reproject DEM to this CRS before rendering (e.g. EPSG:32628).
+  --demtype TEXT               OpenTopography dataset key.  [default: SRTMGL1]
+  --api-key TEXT               OpenTopography API key (or OPENTOPO_API_KEY env var).
+  --exaggeration FLOAT         Vertical exaggeration factor.
+  --samples INT                Blender Cycles render samples.
+  --max-size INT               Maximum pixels on the longest side of the output.
+  --scale INT                  Render resolution percentage (1–100).  [default: 100]
+  --light-azimuth FLOAT        Sun azimuth in degrees (0 = North, clockwise).
+  --light-altitude FLOAT       Sun altitude in degrees (0 = horizon, 90 = overhead).
+  --color-relief FILE          gdaldem colour ramp file for hypsometric tint.
+  --color-relief-mode TEXT     overlay | separate | both.  [default: overlay]
+  --clip-mask                  Clip output to the GeoJSON polygon shape (RGBA).
+  --dry-run                    Print estimated download/render info and exit.
+  --no-render                  Download and process DEM only; skip Blender.
+  --blender-bin PATH           Path to the Blender executable.
+  --verbose                    Detailed progress log.
+  --keep-workdir               Keep the temporary working directory after render.
+  --help                       Show this message and exit.
+```
+
+---
+
+## Workflows and examples
+
+### 1. Minimal — download + render
+
+The simplest invocation. The OpenTopography API key is only used here.
 
 ```bash
 blender-relief \
-  --dem local_dem.tif \
-  --bbox region.geojson \
-  --template relief.blend \
-  --output shaded_relief.png
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife.png
 ```
 
-### Quick preview at 25% resolution
+---
+
+### 2. Using your own DEM
+
+Skip the download entirely. Any GeoTIFF works — local surveys, IGN, Copernicus Land Monitor, USGS, whatever you have. No API key required.
 
 ```bash
 blender-relief \
-  --bbox region.geojson \
-  --template relief.blend \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem /data/mdt05-canarias.tif \
+  --output tenerife.png
+```
+
+> `--bbox` is still used to crop the DEM to the area of interest.
+
+---
+
+### 3. Hypsometric colour tint
+
+Composite a colour-by-elevation layer over the render using multiply blending. Requires `gdaldem` (ships with any GDAL install).
+
+```bash
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife.png \
+  --color-relief examples/ramp_terrain.txt
+```
+
+The included `examples/ramp_terrain.txt` covers −500 m (deep water) to 5 000 m (permanent snow). Edit elevation breakpoints and colours freely.
+
+---
+
+### 4. Separate colour layer for compositing
+
+Get the shaded render and the colour layer as independent files — perfect for further compositing in Photoshop, Affinity Photo or GIMP.
+
+```bash
+# Both composite and raw colour layer
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife.png \
+  --color-relief examples/ramp_terrain.txt \
+  --color-relief-mode both
+# → tenerife.png        shaded relief + tint composited
+# → tenerife_color.png  raw colour layer, no shading
+
+# Only the colour layer — render left untouched
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife.png \
+  --color-relief examples/ramp_terrain.txt \
+  --color-relief-mode separate
+# → tenerife.png        shaded relief, untouched
+# → tenerife_color.png  raw colour layer
+```
+
+---
+
+### 5. Clip to an irregular polygon
+
+Cut the output to any shape — coastlines, administrative boundaries, watersheds — with full alpha transparency.
+
+```bash
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife_clipped.png \
+  --clip-mask
+```
+
+The clip shape is taken from `--bbox`. For precise cuts, supply a polygon that follows the actual coastline or boundary rather than a rectangular bbox.
+
+---
+
+### 6. Custom sun position
+
+Override the light direction without opening Blender.
+
+```bash
+# Classic NW light (standard cartographic convention)
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife_nw.png \
+  --light-azimuth 315 \
+  --light-altitude 35
+
+# Low, dramatic south light
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife_south.png \
+  --light-azimuth 180 \
+  --light-altitude 15
+```
+
+---
+
+### 7. Vertical exaggeration
+
+Amplify or flatten terrain drama.
+
+```bash
+# Subtle — good for high-relief areas like the Alps or Tenerife
+blender-relief --bbox ... --template ... --output out.png --exaggeration 0.6
+
+# Strong — good for flat areas like deltas or coastal plains
+blender-relief --bbox ... --template ... --output out.png --exaggeration 3.0
+```
+
+---
+
+### 8. Fast preview
+
+Iterate quickly without waiting for a full render.
+
+```bash
+# Quarter resolution, 32 samples — done in seconds
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
   --output preview.png \
   --scale 25 \
-  --api-key YOUR_OPENTOPO_KEY
+  --samples 32
+
+# Cap longest side to 1 000 px
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output preview.png \
+  --max-size 1000 \
+  --samples 64
 ```
 
-### Custom projection (e.g. UTM zone 28N for the Canary Islands)
+---
+
+### 9. Save the DEM and reuse it
+
+Download once, render many times with different templates, sun positions or exaggerations — without hitting the API again.
 
 ```bash
+# Step 1 — download and process DEM; skip rendering
 blender-relief \
-  --bbox tenerife.geojson \
-  --template relief.blend \
-  --output tenerife_relief.png \
-  --crs EPSG:32628 \
-  --api-key YOUR_OPENTOPO_KEY
-```
-
-### Control sun direction
-
-```bash
-blender-relief \
-  --bbox region.geojson \
-  --template relief.blend \
-  --output relief.png \
-  --light-azimuth 315 \
-  --light-altitude 35 \
-  --api-key YOUR_OPENTOPO_KEY
-```
-
-### Apply hypsometric color tint
-
-```bash
-blender-relief \
-  --bbox region.geojson \
-  --template relief.blend \
-  --output relief.png \
-  --color-relief ramp.txt \
-  --api-key YOUR_OPENTOPO_KEY
-```
-
-### Clip output to polygon shape
-
-```bash
-blender-relief \
-  --bbox terrain.geojson \
-  --template relief.blend \
-  --output relief.png \
-  --clip-mask \
-  --api-key YOUR_OPENTOPO_KEY
-```
-
-### Preview without downloading or rendering
-
-```bash
-blender-relief \
-  --bbox region.geojson \
-  --template relief.blend \
-  --output relief.png \
-  --dry-run \
-  --api-key YOUR_OPENTOPO_KEY
-```
-
-### Download and process DEM only (skip render)
-
-```bash
-blender-relief \
-  --bbox region.geojson \
-  --template relief.blend \
-  --output relief.png \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
   --no-render \
-  --save-dem terrain.tif \
-  --api-key YOUR_OPENTOPO_KEY
+  --save-dem dem_tenerife.tif
+
+# Step 2 — render from saved DEM, no internet needed
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem dem_tenerife.tif \
+  --output tenerife_v1.png \
+  --light-azimuth 315 --light-altitude 35
+
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --dem dem_tenerife.tif \
+  --output tenerife_v2.png \
+  --light-azimuth 135 --light-altitude 25 \
+  --exaggeration 1.5
 ```
 
-## Options
+---
 
-| Option | Default | Description |
-|---|---|---|
-| `--config PATH` | — | TOML file with default option values. Keys use underscores (e.g. `light_azimuth`). Command-line arguments always take precedence. See [Configuration file](#configuration-file). |
-| `--bbox PATH` | *(required)* | GeoJSON file with bounding box polygon in WGS84. Supports `Feature`, `FeatureCollection`, `Polygon`, `MultiPolygon`, and `GeometryCollection`. |
-| `--template PATH` | *(required)* | Path to the `.blend` template file. |
-| `--output PATH` | *(required)* | Output PNG file path. |
-| `--dem PATH` | — | Path to an existing DEM GeoTIFF. If omitted, the DEM is downloaded from OpenTopography. |
-| `--save-dem PATH` | — | Save the downloaded DEM to this path after downloading. Useful to reuse it later with `--dem` and avoid re-downloading the same area. Ignored when `--dem` is provided. |
-| `--buffer FLOAT` | `0.05` | Buffer applied to the bbox **before downloading**, as a fraction of its size (`0.05` = 5%). Prevents data loss at the edges after reprojection. Set to `0` to disable. Ignored when `--dem` is provided. |
-| `--crs TEXT` | — | Target CRS for reprojection (e.g. `EPSG:3857`, `EPSG:32628`). If omitted, the DEM is used as downloaded with no reprojection. |
-| `--demtype TEXT` | `SRTMGL1` | OpenTopography dataset. See table below or run `blender-relief --list-demtypes`. |
-| `--list-demtypes` | — | Print all available DEM datasets with resolution and coverage, then exit. |
-| `--api-key TEXT` | — | OpenTopography API key. Can also be set via the `OPENTOPO_API_KEY` environment variable. Get a free key at [portal.opentopography.org](https://portal.opentopography.org/requestService?service=api). |
-| `--exaggeration FLOAT` | *(template)* | Vertical exaggeration factor, applied to the Displacement node's Scale input. Values below `1.0` flatten the terrain; values above `1.0` emphasise relief. If omitted, the template's value is preserved. |
-| `--samples INTEGER` | *(template)* | Number of Cycles render samples. If omitted, the value from the `.blend` template is used. Lower values (e.g. `32`) speed up previews; higher values (e.g. `512`) give cleaner results. |
-| `--max-size INTEGER` | *(template)* | Sets the longest side of the render output to exactly this many pixels, preserving the DEM aspect ratio. If omitted, the resolution from the `.blend` template is used. `--scale` is applied on top of this value. |
-| `--scale INTEGER` | `100` | Render resolution percentage (1–100), applied after `--max-size`. Use `25` or `50` for quick previews. |
-| `--light-azimuth FLOAT` | *(template)* | Sun azimuth in degrees (0 = North, clockwise). Overrides the sun lamp's direction in the template. |
-| `--light-altitude FLOAT` | *(template)* | Sun altitude (elevation) in degrees (0 = horizon, 90 = directly overhead). Overrides the sun lamp's angle in the template. |
-| `--color-relief PATH` | — | Path to a `gdaldem color-relief` ramp file. Composites a hypsometric color tint over the rendered PNG using multiply blending. Requires `gdaldem` on `PATH`. |
-| `--clip-mask` | `false` | Clip the output PNG to the GeoJSON polygon shape. Pixels outside the polygon become transparent (RGBA output). |
-| `--dry-run` | `false` | Print a summary of what would be downloaded and rendered, then exit without doing anything. |
-| `--no-render` | `false` | Download and process the DEM but skip the Blender render step. Use `--save-dem` to keep the processed DEM. |
-| `--blender TEXT` | `blender` | Path to the Blender executable. Useful if Blender is not on your `PATH` (e.g. `"/Applications/Blender.app/Contents/MacOS/Blender"` on macOS). |
-| `--verbose` | `false` | Print detailed progress: GDAL steps, bounding box info, and the full Blender log. By default only the key pipeline steps are shown and Blender output is suppressed (shown only on error). |
-| `--keep-workdir` | `false` | Do not delete the temporary working directory after the render. Useful for inspecting intermediate files (`reprojected.tif`, `dem_blender.tif`). |
+### 10. Reproject to a metric CRS
+
+Reprojecting to a projected CRS reduces distortion, especially at high latitudes or for large areas.
+
+```bash
+# Tenerife → UTM zone 28N
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife_utm.png \
+  --crs EPSG:32628
+
+# Norway → UTM zone 33N
+blender-relief \
+  --bbox norway.geojson \
+  --template tenerife_template.blend \
+  --output norway.png \
+  --crs EPSG:32633
+```
+
+---
+
+### 11. Configuration file
+
+Store per-project defaults in a TOML file and keep commands short. Any CLI option can go in the config file.
+
+**`profiles/tenerife.toml`**
+```toml
+template          = "tenerife_template.blend"
+demtype           = "COP30"
+crs               = "EPSG:32628"
+exaggeration      = 1.2
+light_azimuth     = 315
+light_altitude    = 35
+samples           = 256
+color_ramp        = "examples/ramp_terrain.txt"
+color_relief_mode = "both"
+```
+
+```bash
+# Only specify what changes per run
+blender-relief \
+  --config profiles/tenerife.toml \
+  --bbox examples/tenerife_bbox.geojson \
+  --output renders/tenerife_final.png
+```
+
+Command-line options always override the config file.
+
+---
+
+### 12. Dry run — estimate without downloading
+
+Preview the bounding box, pixel count and plane dimensions before committing.
+
+```bash
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template tenerife_template.blend \
+  --output tenerife.png \
+  --color-relief examples/ramp_terrain.txt \
+  --dry-run
+```
+
+```
+Dry run — nothing will be downloaded or rendered.
+
+  BBox (original):   W=-17.0400  S=27.9400  E=-15.9000  N=28.6200
+  BBox (buffered):   W=-17.0970  S=27.9060  E=-15.8430  N=28.6540  (+5%)
+  DEM type:          SRTMGL1  (SRTM 30m, 1" / ~30m)
+  Estimated pixels:  4177 × 2620
+  Blender plane:     4.177 × 2.620 units
+  CRS:               (none — no reprojection)
+  Render resolution: (from template)  @ 100%
+  Color relief:      examples/ramp_terrain.txt  (mode: both)
+
+Output → tenerife.png
+```
+
+---
+
+### 13. Batch processing
+
+```bash
+# Sequential
+for region in alps pyrenees carpathians; do
+  blender-relief \
+    --config profiles/${region}.toml \
+    --bbox bboxes/${region}.geojson \
+    --output renders/${region}.png
+done
+
+# Parallel with GNU parallel
+parallel blender-relief \
+  --config profiles/{}.toml \
+  --bbox bboxes/{}.geojson \
+  --output renders/{}.png \
+  ::: alps pyrenees carpathians andes rockies
+```
+
+---
+
+## Bounding box format
+
+`--bbox` expects a GeoJSON file with a **Polygon** or **MultiPolygon** in **WGS84 (EPSG:4326)**.
+
+**`examples/tenerife_bbox.geojson`**
+```json
+{
+  "type": "FeatureCollection",
+  "features": [{
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[
+        [-17.04, 27.94],
+        [-15.90, 27.94],
+        [-15.90, 28.62],
+        [-17.04, 28.62],
+        [-17.04, 27.94]
+      ]]
+    }
+  }]
+}
+```
+
+For `--clip-mask`, a non-rectangular polygon that follows a coastline or boundary gives a much cleaner result. Its bounding box is used for the DEM download; the polygon itself is used for the clip.
+
+---
+
+## Creating your own Blender template
+
+The `.blend` file must follow the [Daniel Huffman shaded relief setup](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/). The script looks for:
+
+| Element | Requirement |
+|---|---|
+| Object | Named **`Plane`** |
+| Material | **Use Nodes** enabled |
+| Texture node | An **Image Texture** node whose **Color** output is connected to displacement |
+| Camera | **Orthographic**, pointing straight down (−Z) |
+| Light | A **Sun** lamp (required for `--light-azimuth` / `--light-altitude`) |
+
+The included **`tenerife_template.blend`** is a ready-to-use starting point. Open it in Blender, adjust materials, atmosphere, displacement strength, render settings — then save and use it as your `--template`.
+
+**`blender-relief` only overrides:**
+- Which DEM texture is loaded
+- Plane dimensions and camera ortho scale (derived from DEM pixel size)
+- Render resolution (`--max-size`, `--scale`)
+- Sun rotation (`--light-azimuth`, `--light-altitude`)
+- Displacement scale (`--exaggeration`)
+- Render samples (`--samples`)
+
+Everything else — look, shading, post-processing nodes, output depth — stays exactly as you set it in the GUI.
+
+---
+
+## Colour ramp format
+
+`--color-relief` expects a plain-text file in [gdaldem color-relief format](https://gdal.org/programs/gdaldem.html). Elevations in **metres**, colours in RGB 0–255.
+
+```
+# elevation_m   R    G    B
+-500            50   100  200   # deep water
+   0            70   130  180   # sea level
+   1           194   178  128   # coast / sand
+ 500           140   180  100   # hills / forest
+1500           160   130   90   # sub-alpine
+3000           230   220  210   # snow line
+5000           255   255  255   # permanent snow
+nv               0     0    0   # nodata
+```
+
+A ready-to-use ramp is included at **`examples/ramp_terrain.txt`**.
+
+---
 
 ## Available DEM datasets
 
-The tool estimates the output pixel dimensions before downloading, based on the dataset's native resolution and the bounding box size. The formula is:
-
-```
-pixels_x = ceil((east - west) × 3600 / arcsec)
-pixels_y = ceil((north - south) × 3600 / arcsec)
+```bash
+blender-relief --list-datasets
 ```
 
-| Code | Name | Resolution | Max area |
+| Key | Dataset | Resolution | Coverage |
 |---|---|---|---|
-| `SRTMGL1` | SRTM 30m | 1″ (~30m) | 450,000 km² |
-| `SRTMGL1_E` | SRTM GL1 Ellipsoidal 30m | 1″ (~30m) | 450,000 km² |
-| `SRTMGL3` | SRTM 90m | 3″ (~90m) | 4,050,000 km² |
-| `AW3D30` | ALOS World 3D 30m | 1″ (~30m) | 450,000 km² |
-| `AW3D30_E` | ALOS World 3D Ellipsoidal 30m | 1″ (~30m) | 450,000 km² |
-| `SRTM15Plus` | Global Bathymetry SRTM15+ V2.1 | 15″ (~450m) | 125,000,000 km² |
-| `COP30` | Copernicus DSM 30m | 1″ (~30m) | 450,000 km² |
-| `COP90` | Copernicus DSM 90m | 3″ (~90m) | 4,050,000 km² |
-| `NASADEM` | NASADEM 30m | 1″ (~30m) | 450,000 km² |
-| `EU_DTM` | EU DTM 30m | 1″ (~30m) | 450,000 km² |
-| `GEDI_L3` | GEDI L3 1km | 30″ (~1km) | 450,000 km² |
-| `GEBCOIceTopo` | GEBCO IceTopo 500m | 15″ (~500m) | 4,050,000 km² |
-| `GEBCOSubIceTopo` | GEBCO SubIceTopo 500m | 15″ (~500m) | 4,050,000 km² |
+| `SRTMGL1` | SRTM 30 m | ~30 m | 56°S – 60°N |
+| `SRTMGL3` | SRTM 90 m | ~90 m | 56°S – 60°N |
+| `SRTMGL1_E` | SRTM 30 m Ellipsoidal | ~30 m | 56°S – 60°N |
+| `AW3D30` | ALOS World 3D | ~30 m | Global |
+| `NASADEM` | NASADEM | ~30 m | 56°S – 60°N |
+| `COP30` | Copernicus DEM 30 m | ~30 m | Global |
+| `COP90` | Copernicus DEM 90 m | ~90 m | Global |
 
-## Configuration file
+> Use `COP30` for areas outside SRTM coverage (Scandinavia, Alaska, high Arctic…).
 
-You can store frequently used options in a TOML file and pass it with `--config`. Keys must use underscores (not hyphens) and match the option names exactly. Command-line arguments always take precedence over config file values.
+---
 
-**Example — `relief.toml`:**
+## OpenTopography API key
 
-```toml
-# OpenTopography dataset
-demtype        = "COP30"
+An API key is **only required** when `blender-relief` downloads the DEM automatically (i.e., `--dem` is not used). If you always supply your own data, no account is needed.
 
-# Vertical exaggeration (Displacement node Scale)
-exaggeration   = 2.0
-
-# Cycles render samples
-samples        = 256
-
-# Longest side of render output in pixels
-max_size       = 3000
-
-# Render resolution percentage (applied after max_size)
-scale          = 100
-
-# Sun direction
-light_azimuth  = 315
-light_altitude = 45
-
-# Reproject DEM to this CRS before rendering
-# crs = "EPSG:32628"
-```
-
-**Usage:**
+1. Register for free at [opentopography.org](https://opentopography.org/developers)
+2. Use your key in any of these ways:
 
 ```bash
-blender-relief \
-  --config relief.toml \
-  --bbox tenerife.geojson \
-  --template relief.blend \
-  --output tenerife.png \
-  --api-key YOUR_KEY
+# Environment variable — set once in your shell profile
+export OPENTOPO_API_KEY=your_key_here
+
+# TOML config file
+api_key = "your_key_here"
+
+# Per-command
+blender-relief --api-key your_key_here ...
 ```
 
-You can override any config value on the command line:
+---
+
+## Tips and caveats
+
+**Render speed** — Cycles is GPU-accelerated. Configure Blender under *Preferences → System → Cycles Render Devices*. A 4 K render at 256 samples takes ~60 s on an RTX 3080; ~15 min CPU-only.
+
+**Aspect ratio** — If your DEM's aspect ratio differs from the template's render resolution, thin black bands may appear at the edges. Use `--max-size` to force the render resolution to match the DEM's natural proportions:
 
 ```bash
-# Use the profile but render at a smaller size for a quick preview
-blender-relief --config relief.toml --bbox region.geojson \
-  --template relief.blend --output preview.png \
-  --max-size 800 --scale 50
+blender-relief --bbox region.geojson --template relief.blend \
+  --output out.png --max-size 4000
 ```
 
-## Color relief
+**Large areas** — OpenTopography rate-limits large requests. For areas wider than ~10°, split into tiles or use a local DEM.
 
-The `--color-relief` option overlays a hypsometric color tint on top of the Blender shaded relief. It uses `gdaldem color-relief` to colorize the processed DEM, then composites the result with the render using multiply blending — producing a colored shaded relief where the terrain texture is preserved.
-
-The color ramp file follows the standard `gdaldem` format (elevation in metres, then R G B):
-
-```
-# ramp.txt
-0     70  130 180
-200   210 180 140
-1000  34  139 34
-3000  150 120 90
-5000  255 255 255
-nv    0   0   0
-```
-
-Apply it with:
+**Blender not on PATH** — Pass the full path:
 
 ```bash
-blender-relief --bbox region.geojson --template relief.blend --output out.png \
-  --color-relief ramp.txt --api-key YOUR_KEY
+# macOS
+--blender-bin /Applications/Blender.app/Contents/MacOS/Blender
+
+# Linux
+--blender-bin /opt/blender/blender
 ```
 
-`gdaldem` must be installed and available on `PATH`. It is included with GDAL (conda-forge or system package).
-
-## Clip mask
-
-The `--clip-mask` flag clips the output PNG to the exact shape of the GeoJSON polygon. Pixels outside the polygon become transparent (the output PNG will have an alpha channel). This is useful when the bounding box is rectangular but you want to present a non-rectangular area — for example, clipping to a country or administrative boundary.
-
-```bash
-blender-relief --bbox boundary.geojson --template relief.blend --output out.png \
-  --clip-mask --api-key YOUR_KEY
-```
-
-When combined with `--color-relief`, the color tint is applied first and then the clip mask is applied on top.
-
-## Environment variables
-
-| Variable | Description |
-|---|---|
-| `OPENTOPO_API_KEY` | OpenTopography API key. Equivalent to `--api-key`. |
+**Debugging** — `--verbose` shows the full GDAL pipeline and Blender log. `--keep-workdir` preserves the temporary directory for inspecting intermediate files.
