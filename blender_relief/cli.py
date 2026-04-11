@@ -77,8 +77,12 @@ def _find_blender(blender_bin: str) -> str:
     help="List all available DEM datasets and exit.",
 )
 @click.option(
-    "--bbox", required=True, type=click.Path(exists=True),
-    help="GeoJSON file with bounding box polygon in WGS84.",
+    "--bbox", default=None, type=click.Path(exists=True),
+    help=(
+        "GeoJSON file with bounding box polygon in WGS84. "
+        "Required when downloading from OpenTopography (no --dem). "
+        "Optional when using --dem: if omitted, the full DEM is rendered as-is."
+    ),
 )
 @click.option(
     "--template", required=True, type=click.Path(exists=True),
@@ -210,7 +214,13 @@ def main(
 
     # Resolve absolute paths early
     output_abs = str(pathlib.Path(output).resolve())
-    bbox_abs = str(pathlib.Path(bbox).resolve())
+    bbox_abs = str(pathlib.Path(bbox).resolve()) if bbox else None
+
+    # Validar que bbox esté presente cuando hace falta
+    if dem is None and not bbox:
+        raise click.UsageError(
+            "--bbox es obligatorio cuando no se usa --dem (necesario para descargar de OpenTopography)."
+        )
 
     # --- Dry run ---
     if dry_run:
@@ -245,10 +255,14 @@ def main(
     log.debug(f"Working directory: {workdir}")
 
     try:
-        # Extract bbox coordinates from GeoJSON
-        bbox_wgs84 = extract_wgs84_bbox(bbox_abs)
-        west, south, east, north = bbox_wgs84
-        log.debug(f"Bounding box (WGS84): W={west:.4f} S={south:.4f} E={east:.4f} N={north:.4f}")
+        # Extract bbox coordinates from GeoJSON (si se proporcionó)
+        if bbox_abs:
+            bbox_wgs84 = extract_wgs84_bbox(bbox_abs)
+            west, south, east, north = bbox_wgs84
+            log.debug(f"Bounding box (WGS84): W={west:.4f} S={south:.4f} E={east:.4f} N={north:.4f}")
+        else:
+            bbox_wgs84 = None
+            log.debug("Sin bbox — se renderizará el DEM completo")
 
         # Download DEM if not provided
         if dem is None:
@@ -264,7 +278,7 @@ def main(
         else:
             input_dem = str(pathlib.Path(dem).resolve())
 
-        # Process DEM: reproject, crop, rescale
+        # Process DEM: reproject, crop (si hay bbox), rescale
         dem_blender_path = os.path.join(workdir, "dem_blender.tif")
         result = process_dem(
             input_dem=input_dem,
@@ -314,9 +328,12 @@ def main(
             )
 
         if clip_mask:
-            from .mask import apply_clip_mask
-            log.info("Applying clip mask...")
-            apply_clip_mask(output_abs, result.dem_path, bbox_abs, output_abs)
+            if not bbox_abs:
+                log.info("Aviso: --clip-mask ignorado (requiere --bbox).")
+            else:
+                from .mask import apply_clip_mask
+                log.info("Applying clip mask...")
+                apply_clip_mask(output_abs, result.dem_path, bbox_abs, output_abs)
 
         elapsed = time.monotonic() - t_start
         m, s = divmod(int(elapsed), 60)

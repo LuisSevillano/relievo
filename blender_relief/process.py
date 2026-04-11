@@ -68,16 +68,16 @@ def reproject_bbox(
 
 def process_dem(
     input_dem: str,
-    bbox_wgs84: tuple,
+    bbox_wgs84: tuple | None,
     target_crs: str | None,
     output_path: str,
     workdir: str,
 ) -> ProcessResult:
-    """Reproject (optional), crop, and rescale a DEM for Blender rendering.
+    """Reproject (optional), crop (optional), and rescale a DEM for Blender rendering.
 
     Args:
         input_dem: Path to input DEM GeoTIFF (any CRS).
-        bbox_wgs84: (west, south, east, north) in WGS84 degrees.
+        bbox_wgs84: (west, south, east, north) in WGS84 degrees, or None to use the full DEM.
         target_crs: Target CRS string (e.g. 'EPSG:3857'), or None to skip reprojection.
         output_path: Absolute path for the output dem_blender.tif.
         workdir: Temporary directory for intermediate files.
@@ -106,21 +106,26 @@ def process_dem(
     src_max = band.GetMaximum()
     ds = None
 
-    west_wgs, south_wgs, east_wgs, north_wgs = bbox_wgs84
-    if target_crs:
-        west_m, south_m, east_m, north_m = reproject_bbox(
-            west_wgs, south_wgs, east_wgs, north_wgs, "EPSG:4326", target_crs,
-        )
+    if bbox_wgs84 is not None:
+        west_wgs, south_wgs, east_wgs, north_wgs = bbox_wgs84
+        if target_crs:
+            west_m, south_m, east_m, north_m = reproject_bbox(
+                west_wgs, south_wgs, east_wgs, north_wgs, "EPSG:4326", target_crs,
+            )
+        else:
+            west_m, south_m, east_m, north_m = west_wgs, south_wgs, east_wgs, north_wgs
+        proj_win = [west_m, north_m, east_m, south_m]
+        log.debug("Cropping and rescaling to 16-bit...")
     else:
-        west_m, south_m, east_m, north_m = west_wgs, south_wgs, east_wgs, north_wgs
+        proj_win = None
+        log.debug("Rescaling to 16-bit (full DEM, no crop)...")
 
-    log.debug("Cropping and rescaling to 16-bit...")
     ds = gdal.Translate(
         output_path, reprojected_path,
         options=gdal.TranslateOptions(
             outputType=gdal.GDT_UInt16,
             scaleParams=[[src_min, src_max, 0, 65535]],
-            projWin=[west_m, north_m, east_m, south_m],
+            projWin=proj_win,
             format="GTiff",
         ),
     )
