@@ -99,35 +99,36 @@ def main() -> None:
     img.colorspace_settings.name = "Non-Color"
     find_dem_texture_node(mat).image = img
 
-    plane_x = args.raster_x / 1000.0
     plane_y = args.raster_y / 1000.0
-
-    set_plane_exact("Plane", plane_x, plane_y)
 
     scene = bpy.context.scene
 
-    # La resolución del render se adapta al aspect ratio del DEM para que el
-    # plano rellene el frame exacto sin bandas ni distorsión.
-    # Con --max-size se usa ese valor como lado mayor; sin él se usa el lado
-    # mayor que tenga el template, preservando su "escala" aproximada.
     if args.max_size > 0:
-        max_px = args.max_size
+        factor = args.max_size / max(args.raster_x, args.raster_y)
+        rx = int(args.raster_x * factor)
+        ry = int(args.raster_y * factor)
+        scene.render.resolution_x = rx
+        scene.render.resolution_y = ry
+        print(f"Render resolution: {rx}×{ry} px (--max-size {args.max_size})")
     else:
-        max_px = max(scene.render.resolution_x, scene.render.resolution_y)
-
-    factor = max_px / max(args.raster_x, args.raster_y)
-    rx = int(args.raster_x * factor)
-    ry = int(args.raster_y * factor)
-    scene.render.resolution_x = rx
-    scene.render.resolution_y = ry
-    print(f"Render resolution: {rx}×{ry} px  (DEM aspect {args.raster_x/args.raster_y:.3f})")
+        print(f"Render resolution: {scene.render.resolution_x}×{scene.render.resolution_y} px (from template)")
 
     scene.render.resolution_percentage = args.scale
 
     if scene.camera:
+        # El plano se escala para rellenar exactamente el frame del render.
+        # plane_x = plane_y * render_aspect → sin bandas, sin distorsión del render.
+        # La textura DEM (UV 0-1) se mapea sobre el plano entero: si el DEM
+        # es más ancho que el render, se mostrará el centro del DEM; si es
+        # más alto, se mostrará todo el alto y se añadirá fondo a los lados.
+        render_aspect = scene.render.resolution_x / scene.render.resolution_y
+        plane_x = plane_y * render_aspect
+
+        set_plane_exact("Plane", plane_x, plane_y)
+
         scene.camera.data.sensor_fit = 'VERTICAL'
         scene.camera.data.ortho_scale = plane_y
-        print(f"Camera: ortho_scale={plane_y:.4f}  plane={plane_x:.3f}×{plane_y:.3f}")
+        print(f"Camera: ortho_scale={plane_y:.4f}  plane={plane_x:.3f}×{plane_y:.3f}  render_aspect={render_aspect:.3f}")
 
     if args.exaggeration is not None:
         for node in mat.node_tree.nodes:
