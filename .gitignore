@@ -23,6 +23,5 @@ sample_bbox.geojson
 .DS_Store
 
 # Misc
-execute.sh
 *.tif
 *.tif.aux.xml
