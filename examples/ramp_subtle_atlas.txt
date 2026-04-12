@@ -1,0 +1,20 @@
+# Subtle atlas-style hypsometric ramp for gdaldem color-relief
+# Soft creams, pale blues, and muted warm highlights.
+# Format: elevation_m  R  G  B
+
+-3000   176  198  210   # deep ocean
+-1500   196  214  224   # ocean
+-500    214  228  234   # shelf
+0       230  238  240   # sea level
+1       236  234  223   # coast
+200     232  231  221   # lowland
+500     226  228  221   # plains
+900     218  224  221   # rolling hills
+1300    210  219  220   # lower mountains
+1700    205  215  219   # mountains
+2200    213  214  208   # high ridges
+2800    223  220  211   # alpine
+3400    233  230  220   # near snow line
+4200    242  240  233   # snow
+5200    249  248  246   # permanent snow
+nv        0    0    0   # nodata

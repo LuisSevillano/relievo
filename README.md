@@ -4,6 +4,8 @@
 
 `relievo` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode separate` to get the composite *and* the raw colour layer - all scriptable, all reproducible.
 
+`relievo` requires Blender installed locally and available in your `PATH` (or passed via `--blender`).
+
 Think of it as the Blender shaded-relief workflow you already know, but without opening Blender, wiring nodes by hand, or clicking through half a dozen panels before your first render. Same idea, same cartographic spirit, just with a friendlier CLI and fewer opportunities to get lost in the interface.
 
 > **Inspired by** [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
@@ -226,6 +228,19 @@ relievo \
 
 ![QGIS-inspired elevation ramp](docs/images/tenerife_relief_qgis.png)
 
+Alternative style with a subtler atlas look:
+
+```bash
+relievo \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
+  --dem dem.tif \
+  --output relieve_subtle.png \
+  --color-relief examples/ramp_subtle_atlas.txt
+```
+
+![Subtle atlas tint](docs/images/tenerife_relief_subtle.png)
+
 ---
 
 ### Light from the NW vs south
@@ -345,13 +360,18 @@ Cut the output to any shape - coastlines, administrative boundaries, watersheds 
 
 ```bash
 relievo \
-  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --bbox examples/bboxes/tenerife.geojson \
   --template template.blend \
+  --dem dem.tif \
+  --color-relief examples/ramp_terrain.txt \
+  --color-relief-mode overlay \
   --output tenerife_clipped.png \
   --clip-mask
 ```
 
 The clip shape is taken from `--bbox`. For precise cuts, supply a polygon that follows the actual coastline or boundary rather than a rectangular bbox.
+
+![Tenerife masked to island polygon](docs/images/tenerife_island_masked.png)
 
 ---
 
@@ -703,6 +723,8 @@ nv               0     0    0   # nodata
 A ready-to-use ramp is included at **`examples/ramp_terrain.txt`**.
 
 An additional QGIS-inspired option is available at **`examples/ramp_elevation_qgis.txt`** (based on the QGIS Hub "Elevation Ramp" style family).
+
+A soft atlas-style option with subtle blues and warm highlights is available at **`examples/ramp_subtle_atlas.txt`**.
 
 ---
 
