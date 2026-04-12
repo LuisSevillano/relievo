@@ -7,16 +7,18 @@
 #
 # Adjust elevation values to match your area's elevation range.
 
--500    50   100 200   # deep water
-0       70   130 180   # shallow water / sea level
-1       194  178 128   # coast / sand
-200     210  190 140   # lowlands
-500     140  180 100   # hills / forest
-1000    100  140  70   # mid-altitude forest
-1500    160  130  90   # sub-alpine
-2000    180  160 120   # alpine / rock
-2500    210  200 180   # high rock
-3000    230  220 210   # snow line
-4000    245  240 235   # glaciers
-5000    255  255 255   # permanent snow
+-2000   168  190 198   # deep water (muted blue)
+-1000   188  208 215   # mid-depth water
+-500    206  220 225   # shallow-deep transition
+0       228  238 240   # sea level (#E4EEF0)
+1       210  209 201   # coast / sand (muted)
+200     176  178 170   # lowlands
+500     152  156 148   # hills / sparse vegetation
+1000    133  138 130   # mid-altitude terrain
+1500    148  142 136   # sub-alpine
+2000    165  160 154   # alpine / rock
+2500    188  184 178   # high rock
+3000    212  210 206   # snow line
+4000    232  231 229   # glaciers
+5000    248  248 248   # permanent snow
 nv        0    0   0   # nodata → transparent
