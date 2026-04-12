@@ -2,7 +2,11 @@
 
 **Automated shaded relief maps with Blender. From a bounding box to a publication-ready PNG in one command.**
 
-`relievo` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode both` to get the composite *and* the raw colour layer - all scriptable, all reproducible.
+`relievo` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode separate` to get the composite *and* the raw colour layer - all scriptable, all reproducible.
+
+![Blender setup screenshot](docs/images/blender_screenshot.jpg)
+
+Think of it as the Blender shaded-relief workflow you already know, but without opening Blender, wiring nodes by hand, or clicking through half a dozen panels before your first render. Same idea, same cartographic spirit, just with a friendlier CLI and fewer opportunities to get lost in the interface.
 
 > **Inspired by** [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
 
@@ -457,7 +461,7 @@ relievo \
   --exaggeration 1.5
 ```
 
-> **`--save-dem`** saves the UInt16-rescaled DEM that Blender reads directly.  
+> **`--save-dem`** saves the UInt16-rescaled DEM that Blender reads directly.
 > **`--save-processed-dem`** saves a copy in real metres (float32 GeoTIFF) - handy for computing statistics, opening in QGIS or reusing in other tools. This file is never used by Blender directly.
 
 ---
@@ -700,7 +704,7 @@ relievo --list-demtypes
 | `COP90` | Copernicus DEM 90 m | ~90 m | Global |
 | `SRTM15Plus` | SRTM15+ (bathymetric) | ~500 m | Global (ocean + land) |
 
-> Use `COP30` for areas outside SRTM coverage (Scandinavia, Alaska, high Arctic…).  
+> Use `COP30` for areas outside SRTM coverage (Scandinavia, Alaska, high Arctic…).
 > Use `SRTM15Plus` for ocean bathymetry - it's the only dataset with negative elevations below sea level.
 
 ### Choosing the right resolution
