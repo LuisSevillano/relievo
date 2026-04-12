@@ -9,12 +9,6 @@ pre-commit run --all-files
 pytest tests/ -q
 ```
 
-## Commit style
-
-- Use a single, descriptive subject line.
-- Keep message tone consistent and sentence-cased.
-- Avoid prefixes like `feat:`, `fix:`, `chore:`.
-
 ## Versioning
 
 This project uses semantic versioning:
