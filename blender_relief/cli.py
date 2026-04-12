@@ -134,6 +134,15 @@ def _find_blender(blender_bin: str) -> str:
     help="OpenTopography API key. Can also be set via OPENTOPO_API_KEY env var.",
 )
 @click.option(
+    "--smooth", default=None, type=click.FloatRange(min=1.0, min_open=True),
+    help=(
+        "DEM smoothing factor. Downsamples the DEM by this factor (average) then upsamples "
+        "back (bilinear) to blur terrain detail before rendering. "
+        "Values between 2 and 8 are typical; higher values produce softer relief. "
+        "Useful for regional/national-scale maps following Huffman's recommendations."
+    ),
+)
+@click.option(
     "--exaggeration", default=None, type=float,
     help="Vertical exaggeration factor (Displacement node Scale). "
          "If omitted, uses the template's value. Try 0.5 to flatten, 2.0 to emphasise relief.",
@@ -202,7 +211,7 @@ def _find_blender(blender_bin: str) -> str:
 )
 def main(
     bbox, template, output, buffer, dem, save_dem, save_processed_dem, crs, demtype, api_key,
-    exaggeration, samples, max_size, scale,
+    smooth, exaggeration, samples, max_size, scale,
     light_azimuth, light_altitude, color_ramp, color_relief_mode, clip_mask,
     dry_run, no_render,
     verbose, blender_bin, keep_workdir,
@@ -314,6 +323,7 @@ def main(
             output_path=dem_blender_path,
             workdir=workdir,
             save_processed_dem=save_processed_abs,
+            smooth=smooth,
         )
 
         if no_render:

@@ -66,6 +66,53 @@ def reproject_bbox(
     return (min(xs), min(ys), max(xs), max(ys))
 
 
+def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) -> None:
+    """Apply a low-pass filter by downsampling and upsampling.
+
+    Downsamples the DEM by *factor* (using average resampling) then
+    upsamples back to the original resolution (bilinear).  The result
+    is a spatially smoothed DEM that merges minor peaks and noise into
+    broader landform structures — useful for regional/national-scale
+    renders following Huffman's "less Blender-y" recommendations.
+
+    Args:
+        input_path: Source GeoTIFF (any float type).
+        output_path: Destination for the smoothed GeoTIFF.
+        factor: Downsampling factor (e.g. 4 → pixels 4× larger in both axes
+                before upsampling back).  Values between 2 and 10 are typical.
+        workdir: Directory for the intermediate coarse file.
+    """
+    ds = gdal.Open(input_path)
+    gt = ds.GetGeoTransform()
+    orig_x_res = abs(gt[1])
+    orig_y_res = abs(gt[5])
+    ds = None
+
+    coarse_path = str(Path(workdir) / "_smooth_coarse.tif")
+    # Step 1 — average-downsample to coarse resolution
+    gdal.Warp(
+        coarse_path, input_path,
+        options=gdal.WarpOptions(
+            xRes=orig_x_res * factor,
+            yRes=orig_y_res * factor,
+            resampleAlg="average",
+            format="GTiff",
+        ),
+    )
+    # Step 2 — bilinear-upsample back to original resolution
+    gdal.Warp(
+        output_path, coarse_path,
+        options=gdal.WarpOptions(
+            xRes=orig_x_res,
+            yRes=orig_y_res,
+            resampleAlg="bilinear",
+            format="GTiff",
+        ),
+    )
+    import os as _os
+    _os.remove(coarse_path)
+
+
 def process_dem(
     input_dem: str,
     bbox_wgs84: tuple | None,
@@ -73,8 +120,9 @@ def process_dem(
     output_path: str,
     workdir: str,
     save_processed_dem: str | None = None,
+    smooth: float | None = None,
 ) -> ProcessResult:
-    """Reproject (optional), crop (optional), and rescale a DEM for Blender rendering.
+    """Reproject (optional), smooth (optional), crop (optional), and rescale a DEM for Blender.
 
     Args:
         input_dem: Path to input DEM GeoTIFF (any CRS).
@@ -83,6 +131,8 @@ def process_dem(
         output_path: Absolute path for the output dem_blender.tif (UInt16).
         workdir: Temporary directory for intermediate files.
         save_processed_dem: If given, copy the cropped/reprojected DEM (real metres) here.
+        smooth: Smoothing factor (e.g. 4). Downsamples by this factor then upsamples back
+                to blur the DEM before rendering. None or 0 means no smoothing.
     """
     _require_gdal()
     if target_crs:
@@ -99,6 +149,13 @@ def process_dem(
     else:
         reprojected_path = input_dem
         log.info("Processing DEM  (no reprojection)")
+
+    # Smooth DEM (optional) — low-pass filter via downsample + upsample
+    if smooth and smooth > 1.0:
+        smoothed_path = str(Path(workdir) / "a2b_smoothed.tif")
+        log.info(f"Smoothing DEM  (factor {smooth:.1f}×)…")
+        _smooth_dem(reprojected_path, smoothed_path, smooth, workdir)
+        reprojected_path = smoothed_path
 
     # Crop first (if bbox given) so that src_min/src_max reflect only the
     # area of interest — not the entire raster extent.

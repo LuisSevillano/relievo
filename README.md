@@ -160,6 +160,7 @@ Options:
   --scale INT                  Render resolution percentage (1–100).  [default: 100]
   --light-azimuth FLOAT        Sun azimuth in degrees (0 = North, clockwise).
   --light-altitude FLOAT       Sun altitude in degrees (0 = horizon, 90 = overhead).
+  --smooth FLOAT               DEM smoothing factor (>1). Blurs terrain before rendering.
   --color-relief FILE          gdaldem colour ramp file for hypsometric tint.
   --color-relief-mode TEXT     overlay | separate | both.  [default: overlay]
   --clip-mask                  Clip output to the GeoJSON polygon shape (RGBA).
@@ -373,7 +374,36 @@ blender-relief --bbox ... --template ... --output out.png --exaggeration 3.0
 
 ---
 
-### 8. Fast preview
+### 8. Smooth the DEM to reduce visual noise
+
+For regional or national-scale maps, the raw DEM contains micro-terrain detail (sensor noise, interpolation artifacts, minor ridges) that at small scale reads as visual clutter rather than useful information. `--smooth` applies a low-pass filter — downsamples the DEM by the given factor (average resampling) then upsamples back (bilinear) — to merge that noise into broader, cleaner landform structures before rendering.
+
+```bash
+# No smoothing — every terrain artifact rendered at full fidelity
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template template.blend \
+  --dem dem.tif \
+  --output tenerife_sharp.png
+
+# Smooth factor 8 — major landform structures read more clearly
+blender-relief \
+  --bbox examples/tenerife_bbox.geojson \
+  --template template.blend \
+  --dem dem.tif \
+  --output tenerife_smooth.png \
+  --smooth 8
+```
+
+| No smoothing | `--smooth 8` |
+|:---:|:---:|
+| ![Tenerife no smoothing](docs/images/tenerife_no_smooth.png) | ![Tenerife smooth 8](docs/images/tenerife_smooth_8.png) |
+
+> **Values to try:** 2–4 for subtle softening; 6–10 for regional maps where fine detail is not needed. Values above 10 tend to flatten ridges too aggressively.
+
+---
+
+### 9. Fast preview — quick iteration
 
 Iterate quickly without waiting for a full render.
 
@@ -397,7 +427,7 @@ blender-relief \
 
 ---
 
-### 9. Save the DEM and reuse it
+### 10. Save the DEM and reuse it
 
 Download once, render many times with different templates, sun positions or exaggerations — without hitting the API again.
 
@@ -432,7 +462,7 @@ blender-relief \
 
 ---
 
-### 10. Reproject to a metric CRS
+### 11. Reproject to a metric CRS
 
 Reprojecting to a projected CRS reduces distortion, especially at high latitudes or for large areas.
 `--crs` accepts any string that GDAL understands: EPSG codes, PROJ strings, WKT, etc.
@@ -499,7 +529,7 @@ nv    0   0   0   0   # nodata → transparent
 
 ---
 
-### 11. Configuration file
+### 12. Configuration file
 
 Store per-project defaults in a TOML file and keep commands short. Any CLI option can go in the config file.
 
@@ -528,7 +558,7 @@ Command-line options always override the config file.
 
 ---
 
-### 12. Dry run — estimate without downloading
+### 13. Dry run — estimate without downloading
 
 Preview the bounding box, pixel count and plane dimensions before committing.
 
@@ -558,7 +588,7 @@ Output → tenerife.png
 
 ---
 
-### 13. Batch processing
+### 14. Batch processing
 
 ```bash
 # Sequential
@@ -760,26 +790,17 @@ Adjust from there based on your visual judgment — these are departure points, 
 
 Blender faithfully renders every noise artifact, sensor stripe and interpolation glitch in the source data. For regional or national-scale maps, pre-smoothing the DEM eliminates visual clutter and makes large landform structures read more clearly — exactly as traditional hand-drawn relief simplifies and generalises terrain.
 
-A simple approach with GDAL:
+Use `--smooth` to apply a low-pass filter built into the pipeline:
 
 ```bash
-# Resample to a coarser grid and back — effective low-pass filter
-gdalwarp -tr 0.003 0.003 -r average input.tif smoothed_coarse.tif
-gdalwarp -tr 0.001 0.001 -r bilinear smoothed_coarse.tif smoothed.tif
+# Factor 4 — subtle softening, good for island or province scale
+blender-relief --dem dem.tif --bbox region.geojson --smooth 4 ...
 
-# Then render from the smoothed version
-blender-relief --dem smoothed.tif --bbox region.geojson ...
+# Factor 8 — stronger smoothing, suitable for country or region scale
+blender-relief --dem dem.tif --bbox region.geojson --smooth 8 ...
 ```
 
-Or blend the smoothed and original DEMs for a "soft detail" effect (Huffman recommends ~80–90% smoothed + 10–20% original):
-
-```bash
-# Blend with gdal_calc (requires gdal-bin / conda gdal)
-gdal_calc.py -A smoothed.tif -B input.tif \
-  --outfile=blended.tif \
-  --calc="0.85*A + 0.15*B" \
-  --NoDataValue=0
-```
+See [Smooth the DEM to reduce visual noise](#8-smooth-the-dem-to-reduce-visual-noise) for a side-by-side comparison.
 
 ### Relief as background, not foreground
 
