@@ -487,9 +487,9 @@ nv    0   0   0   0   # nodata → transparent
 3000 225 215 200      # high peaks
 ```
 
-| Shaded relief | Color overlay |
-|:---:|:---:|
-| ![Hormuz shaded relief](docs/images/hormuz_relief.png) | ![Hormuz color overlay](docs/images/hormuz_relief_color.png) |
+| Shaded relief | Color layer | Combined |
+|:---:|:---:|:---:|
+| ![Hormuz shaded relief](docs/images/hormuz_shaded.png) | ![Hormuz color layer](docs/images/hormuz_relief_color.png) | ![Hormuz combined](docs/images/hormuz_relief.png) |
 
 ---
 
