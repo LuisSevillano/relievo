@@ -1,0 +1,12 @@
+# Adapted from QGIS "Festive" ramp (festive_Xy7DzYE.xml)
+# Tuned for Pyrenees banner contrast in gdaldem color-relief format
+nv        0    0    0    0
+-600    242  244  236
+-200    224  236  206
+0       208  228  176
+220     110  184   63
+700     155  155  155
+1400    234  178   75
+2200    182   37   40
+2800    214   86   92
+3300    246  236  224
