@@ -4,8 +4,6 @@
 
 `relievo` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode separate` to get the composite *and* the raw colour layer - all scriptable, all reproducible.
 
-![Blender setup screenshot](docs/images/blender_screenshot.jpg)
-
 Think of it as the Blender shaded-relief workflow you already know, but without opening Blender, wiring nodes by hand, or clicking through half a dozen panels before your first render. Same idea, same cartographic spirit, just with a friendlier CLI and fewer opportunities to get lost in the interface.
 
 > **Inspired by** [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
@@ -13,6 +11,10 @@ Think of it as the Blender shaded-relief workflow you already know, but without 
 | Shaded relief | + hypsometric tint |
 |---|---|
 | ![Tenerife shaded relief](docs/images/tenerife_relief.png) | ![Tenerife with colour tint](docs/images/tenerife_relief_color.png) |
+
+And this is the Blender setup it automates behind the scenes, so you can keep the power and skip the interface gymnastics:
+
+![Blender setup screenshot](docs/images/blender_screenshot.jpg)
 
 ---
 
@@ -123,8 +125,8 @@ relievo --list-demtypes
 export OPENTOPO_API_KEY=your_key_here   # only needed if downloading the DEM automatically
 
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife.png
 ```
 
@@ -132,8 +134,8 @@ No API key? Pass your own DEM - no account needed:
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem /data/my_dem.tif \
   --output tenerife.png
 ```
@@ -180,7 +182,7 @@ Options:
 
 ## Gallery
 
-All examples below use **`examples/tenerife_bbox.geojson`** and **`dem.tif`** (pre-downloaded) as input. No API key required.
+All examples below use **`examples/bboxes/tenerife_bbox.geojson`** and **`dem.tif`** (pre-downloaded) as input. No API key required.
 
 ---
 
@@ -188,8 +190,8 @@ All examples below use **`examples/tenerife_bbox.geojson`** and **`dem.tif`** (p
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem dem.tif \
   --output relieve.png
 ```
@@ -202,8 +204,8 @@ relievo \
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem dem.tif \
   --output relieve.png \
   --color-relief examples/ramp_terrain.txt
@@ -233,8 +235,8 @@ relievo ... --light-azimuth 180 --light-altitude 18
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem dem.tif \
   --output relieve.png \
   --color-relief examples/ramp_terrain.txt \
@@ -257,8 +259,8 @@ The simplest invocation. The OpenTopography API key is only used here.
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife.png
 ```
 
@@ -270,8 +272,8 @@ Skip the download entirely. Any GeoTIFF works - local surveys, IGN, Copernicus L
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem /data/mdt05-canarias.tif \
   --output tenerife.png
 ```
@@ -286,8 +288,8 @@ Composite a colour-by-elevation layer over the render using multiply blending. R
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife.png \
   --color-relief examples/ramp_terrain.txt
 ```
@@ -303,8 +305,8 @@ Get the shaded render and the colour layer as independent files - perfect for fu
 ```bash
 # Both composite and raw colour layer
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife.png \
   --color-relief examples/ramp_terrain.txt \
   --color-relief-mode both
@@ -313,8 +315,8 @@ relievo \
 
 # Only the colour layer - render left untouched
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife.png \
   --color-relief examples/ramp_terrain.txt \
   --color-relief-mode separate
@@ -330,8 +332,8 @@ Cut the output to any shape - coastlines, administrative boundaries, watersheds 
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife_clipped.png \
   --clip-mask
 ```
@@ -347,16 +349,16 @@ Override the light direction without opening Blender.
 ```bash
 # Classic NW light (standard cartographic convention)
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife_nw.png \
   --light-azimuth 315 \
   --light-altitude 35
 
 # Low, dramatic south light
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife_south.png \
   --light-azimuth 180 \
   --light-altitude 15
@@ -385,14 +387,14 @@ For regional or national-scale maps, the raw DEM contains micro-terrain detail (
 ```bash
 # No smoothing - every terrain artifact rendered at full fidelity
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
   --template template.blend \
   --dem dem.tif \
   --output tenerife_sharp.png
 
 # Smooth factor 8 - major landform structures read more clearly
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
   --template template.blend \
   --dem dem.tif \
   --output tenerife_smooth.png \
@@ -414,16 +416,16 @@ Iterate quickly without waiting for a full render.
 ```bash
 # Quarter resolution, 32 samples - done in seconds
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output preview.png \
   --scale 25 \
   --samples 32
 
 # Cap longest side to 1 000 px
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output preview.png \
   --max-size 1000 \
   --samples 64
@@ -438,23 +440,23 @@ Download once, render many times with different templates, sun positions or exag
 ```bash
 # Step 1 - download and process DEM; skip rendering
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --no-render \
   --save-dem dem_tenerife.tif \
   --save-processed-dem dem_tenerife_metres.tif   # optional: metres copy for GIS inspection
 
 # Step 2 - render from saved DEM, no internet needed
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem dem_tenerife.tif \
   --output tenerife_v1.png \
   --light-azimuth 315 --light-altitude 35
 
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --dem dem_tenerife.tif \
   --output tenerife_v2.png \
   --light-azimuth 135 --light-altitude 25 \
@@ -474,15 +476,15 @@ Reprojecting to a projected CRS reduces distortion, especially at high latitudes
 ```bash
 # Tenerife → UTM zone 28N
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife_utm.png \
   --crs EPSG:32628
 
 # Norway → UTM zone 33N
 relievo \
   --bbox norway.geojson \
-  --template tenerife_template.blend \
+  --template template.blend \
   --output norway.png \
   --crs EPSG:32633
 
@@ -539,7 +541,7 @@ Store per-project defaults in a TOML file and keep commands short. Any CLI optio
 
 **`profiles/tenerife.toml`**
 ```toml
-template          = "tenerife_template.blend"
+template          = "template.blend"
 demtype           = "COP30"
 crs               = "EPSG:32628"
 exaggeration      = 1.2
@@ -554,7 +556,7 @@ color_relief_mode = "both"
 # Only specify what changes per run
 relievo \
   --config profiles/tenerife.toml \
-  --bbox examples/tenerife_bbox.geojson \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
   --output renders/tenerife_final.png
 ```
 
@@ -568,8 +570,8 @@ Preview the bounding box, pixel count and plane dimensions before committing.
 
 ```bash
 relievo \
-  --bbox examples/tenerife_bbox.geojson \
-  --template tenerife_template.blend \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
   --output tenerife.png \
   --color-relief examples/ramp_terrain.txt \
   --dry-run
@@ -617,7 +619,7 @@ parallel relievo \
 
 `--bbox` expects a GeoJSON file with a **Polygon** or **MultiPolygon** in **WGS84 (EPSG:4326)**.
 
-**`examples/tenerife_bbox.geojson`**
+**`examples/bboxes/tenerife_bbox.geojson`**
 ```json
 {
   "type": "FeatureCollection",
@@ -653,7 +655,9 @@ The `.blend` file must follow the [Daniel Huffman shaded relief setup](https://s
 | Camera | **Orthographic**, pointing straight down (−Z) |
 | Light | A **Sun** lamp (required for `--light-azimuth` / `--light-altitude`) |
 
-The included **`tenerife_template.blend`** is a ready-to-use starting point. Open it in Blender, adjust materials, atmosphere, displacement strength, render settings - then save and use it as your `--template`.
+The included **`template.blend`** is a ready-to-use starting point. Open it in Blender, adjust materials, atmosphere, displacement strength, render settings - then save and use it as your `--template`.
+
+By default, that template includes **two Sun lights** with different strengths and `angle` values. This gives a balanced base look out of the box, while still letting you override direction from the CLI with `--light-azimuth` and `--light-altitude`.
 
 **`relievo` only overrides:**
 - Which DEM texture is loaded

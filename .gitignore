@@ -14,9 +14,6 @@ build/
 log.txt
 out*.png
 
-# Blender project files (user-specific templates)
-tenerife_template.blend
-
 # macOS
 .DS_Store
 
