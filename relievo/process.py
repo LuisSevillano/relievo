@@ -72,7 +72,7 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
     Downsamples the DEM by *factor* (using average resampling) then
     upsamples back to the original resolution (bilinear).  The result
     is a spatially smoothed DEM that merges minor peaks and noise into
-    broader landform structures — useful for regional/national-scale
+    broader landform structures - useful for regional/national-scale
     renders following Huffman's "less Blender-y" recommendations.
 
     Args:
@@ -89,7 +89,7 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
     ds = None
 
     coarse_path = str(Path(workdir) / "_smooth_coarse.tif")
-    # Step 1 — average-downsample to coarse resolution
+    # Step 1 - average-downsample to coarse resolution
     gdal.Warp(
         coarse_path, input_path,
         options=gdal.WarpOptions(
@@ -99,7 +99,7 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
             format="GTiff",
         ),
     )
-    # Step 2 — bilinear-upsample back to original resolution
+    # Step 2 - bilinear-upsample back to original resolution
     gdal.Warp(
         output_path, coarse_path,
         options=gdal.WarpOptions(
@@ -150,7 +150,7 @@ def process_dem(
         reprojected_path = input_dem
         log.info("Processing DEM  (no reprojection)")
 
-    # Smooth DEM (optional) — low-pass filter via downsample + upsample
+    # Smooth DEM (optional) - low-pass filter via downsample + upsample
     if smooth and smooth > 1.0:
         smoothed_path = str(Path(workdir) / "a2b_smoothed.tif")
         log.info(f"Smoothing DEM  (factor {smooth:.1f}×)…")
@@ -158,7 +158,7 @@ def process_dem(
         reprojected_path = smoothed_path
 
     # Crop first (if bbox given) so that src_min/src_max reflect only the
-    # area of interest — not the entire raster extent.
+    # area of interest - not the entire raster extent.
     if bbox_wgs84 is not None:
         west_wgs, south_wgs, east_wgs, north_wgs = bbox_wgs84
         if target_crs:

@@ -1,4 +1,4 @@
-# Hypsometric + bathymetric tint — Gulf of Oman / Persian Gulf
+# Hypsometric + bathymetric tint - Gulf of Oman / Persian Gulf
 # Requires a DEM with negative values (e.g. SRTM15Plus / GEBCO)
 #
 # nodata → transparent

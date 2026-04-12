@@ -14,11 +14,6 @@ log.txt
 # Blender project files (user-specific templates)
 tenerife_template.blend
 
-# GeoJSON test data (keep only tests/)
-rectangle.geojson
-rectangle_small.geojson
-sample_bbox.geojson
-
 # macOS
 .DS_Store
 

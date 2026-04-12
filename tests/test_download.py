@@ -1,4 +1,4 @@
-"""Tests for download.py — bbox extraction, buffering, pixel estimation, and download."""
+"""Tests for download.py - bbox extraction, buffering, pixel estimation, and download."""
 
 import json
 import os
@@ -7,14 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from blender_relief.download import (
+from relievo.download import (
     DEM_DATASETS,
     buffer_bbox,
     download_dem,
     estimate_pixels,
     extract_wgs84_bbox,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -212,7 +211,7 @@ def test_dem_datasets_not_empty():
 
 
 # ---------------------------------------------------------------------------
-# download_dem (mocked — no real network calls)
+# download_dem (mocked - no real network calls)
 # ---------------------------------------------------------------------------
 
 def _mock_response(status_code=200, content_type="image/tiff", content=b"TIFF_DATA"):
@@ -225,7 +224,7 @@ def _mock_response(status_code=200, content_type="image/tiff", content=b"TIFF_DA
     return mock
 
 
-@patch("blender_relief.download.requests.get")
+@patch("relievo.download.requests.get")
 def test_download_dem_success(mock_get, tmp_path):
     """A successful response writes the content to the output file."""
     mock_get.return_value = _mock_response(200, "image/tiff", b"FAKE_TIFF_BYTES")
@@ -235,7 +234,7 @@ def test_download_dem_success(mock_get, tmp_path):
     assert open(output, "rb").read() == b"FAKE_TIFF_BYTES"
 
 
-@patch("blender_relief.download.requests.get")
+@patch("relievo.download.requests.get")
 def test_download_dem_bad_api_key(mock_get, tmp_path):
     """HTTP 401 raises RuntimeError mentioning the API key."""
     mock_get.return_value = _mock_response(401, "text/html", b"Unauthorized")
@@ -244,7 +243,7 @@ def test_download_dem_bad_api_key(mock_get, tmp_path):
                      str(tmp_path / "dem.tif"))
 
 
-@patch("blender_relief.download.requests.get")
+@patch("relievo.download.requests.get")
 def test_download_dem_bbox_too_large(mock_get, tmp_path):
     """HTTP 400 raises RuntimeError mentioning bbox or dataset."""
     mock_get.return_value = _mock_response(400, "text/html", b"Bad Request")
@@ -253,7 +252,7 @@ def test_download_dem_bbox_too_large(mock_get, tmp_path):
                      str(tmp_path / "dem.tif"))
 
 
-@patch("blender_relief.download.requests.get")
+@patch("relievo.download.requests.get")
 def test_download_dem_html_response(mock_get, tmp_path):
     """HTML response on HTTP 200 raises RuntimeError (API returned error page)."""
     html = b"<html><body>Error</body></html>"
@@ -264,7 +263,7 @@ def test_download_dem_html_response(mock_get, tmp_path):
                      str(tmp_path / "dem.tif"))
 
 
-@patch("blender_relief.download.requests.get")
+@patch("relievo.download.requests.get")
 def test_download_dem_server_error(mock_get, tmp_path):
     """HTTP 500 raises RuntimeError."""
     mock_get.return_value = _mock_response(500, "text/plain", b"Internal Server Error")

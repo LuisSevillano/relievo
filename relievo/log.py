@@ -1,4 +1,4 @@
-"""Simple verbosity-aware logger for blender-relief."""
+"""Simple verbosity-aware logger for relievo."""
 
 import sys
 
@@ -11,7 +11,7 @@ def setup(verbose: bool) -> None:
 
 
 def info(msg: str) -> None:
-    """Always printed — key pipeline steps only."""
+    """Always printed - key pipeline steps only."""
     print(msg, file=sys.stderr)
 
 

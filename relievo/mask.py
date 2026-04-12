@@ -1,7 +1,7 @@
 """Post-processing operations applied to the rendered PNG.
 
-apply_clip_mask  — clips the output to the GeoJSON polygon shape (alpha mask)
-apply_color_relief — composites a hypsometric color tint over the render
+apply_clip_mask  - clips the output to the GeoJSON polygon shape (alpha mask)
+apply_color_relief - composites a hypsometric color tint over the render
 """
 
 import json
@@ -19,7 +19,6 @@ except ImportError:
     _GDAL_AVAILABLE = False
 
 from . import log
-
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -227,9 +226,9 @@ def apply_color_relief(
         output_path: Ruta de salida para el PNG combinado.
         src_min: Elevación mínima (m) usada al reescalar a UInt16.
         src_max: Elevación máxima (m) usada al reescalar a UInt16.
-        mode: ``"overlay"`` — sobreescribe render_png con el resultado combinado;
-              ``"separate"`` — guarda sólo el color sin combinar en output_path;
-              ``"both"`` — guarda el combinado en output_path y el color puro
+        mode: ``"overlay"`` - sobreescribe render_png con el resultado combinado;
+              ``"separate"`` - guarda sólo el color sin combinar en output_path;
+              ``"both"`` - guarda el combinado en output_path y el color puro
               en ``<output_path_sin_ext>_color.<ext>``.
     """
     if not _GDAL_AVAILABLE:
@@ -244,7 +243,7 @@ def apply_color_relief(
     render_img = Image.open(render_png)
     render_w, render_h = render_img.size
 
-    with tempfile.TemporaryDirectory(prefix="blender-relief-cr-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="relievo-cr-") as tmpdir:
         rescaled_ramp = str(pathlib.Path(tmpdir) / "ramp_uint16.txt")
         color_tif     = str(pathlib.Path(tmpdir) / "color_relief.tif")
         color_png_tmp = str(pathlib.Path(tmpdir) / "color_relief.png")

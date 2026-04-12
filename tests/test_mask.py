@@ -1,19 +1,22 @@
-"""Tests for mask.py — clip mask and color relief compositing."""
+"""Tests for mask.py - clip mask and color relief compositing."""
 
 import json
-import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from relievo.mask import _collect_exterior_ring, apply_clip_mask, apply_color_relief
+
 try:
     from PIL import Image
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
 
 try:
     from osgeo import gdal, osr
+
     GDAL_AVAILABLE = True
 except ImportError:
     GDAL_AVAILABLE = False
@@ -23,13 +26,10 @@ pytestmark = pytest.mark.skipif(
     reason="PIL and GDAL are required for mask tests",
 )
 
-
-from blender_relief.mask import apply_clip_mask, apply_color_relief, _collect_exterior_ring
-
-
 # ---------------------------------------------------------------------------
 # _collect_exterior_ring (internal helper)
 # ---------------------------------------------------------------------------
+
 
 def test_collect_exterior_ring_polygon():
     data = {
@@ -57,14 +57,16 @@ def test_collect_exterior_ring_feature():
 def test_collect_exterior_ring_feature_collection():
     data = {
         "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "properties": {},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[[1.0, 1.0], [3.0, 1.0], [3.0, 3.0], [1.0, 3.0], [1.0, 1.0]]],
-            },
-        }],
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[1.0, 1.0], [3.0, 1.0], [3.0, 3.0], [1.0, 3.0], [1.0, 1.0]]],
+                },
+            }
+        ],
     }
     ring = _collect_exterior_ring(data)
     assert len(ring) == 5
@@ -92,6 +94,7 @@ def test_collect_exterior_ring_empty():
 # ---------------------------------------------------------------------------
 # apply_clip_mask
 # ---------------------------------------------------------------------------
+
 
 def _create_wgs84_dem(path: str, west=10.0, north=46.0, size=100):
     """Create a synthetic WGS84 DEM GeoTIFF."""
@@ -141,8 +144,9 @@ def test_clip_mask_inner_polygon(tmp_path, synthetic_png):
     # Inner 50% polygon: lon 10.25–10.75, lat 45.25–45.75
     geojson = {
         "type": "Polygon",
-        "coordinates": [[[10.25, 45.25], [10.75, 45.25],
-                         [10.75, 45.75], [10.25, 45.75], [10.25, 45.25]]],
+        "coordinates": [
+            [[10.25, 45.25], [10.75, 45.25], [10.75, 45.75], [10.25, 45.75], [10.25, 45.25]]
+        ],
     }
     geo_path = str(tmp_path / "inner.geojson")
     with open(geo_path, "w") as f:
@@ -155,7 +159,7 @@ def test_clip_mask_inner_polygon(tmp_path, synthetic_png):
     _, _, _, alpha = img.split()
     pixels = list(alpha.getdata())
     # Corners should be transparent
-    assert pixels[0] == 0   # top-left
+    assert pixels[0] == 0  # top-left
     assert pixels[99] == 0  # top-right
 
 
@@ -196,6 +200,7 @@ def test_clip_mask_output_is_rgba(tmp_path, synthetic_png):
 def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
     """output_path can be the same as render_png (in-place)."""
     import shutil
+
     dem_path = str(tmp_path / "dem.tif")
     _create_wgs84_dem(dem_path, west=10.0, north=46.0, size=100)
 
@@ -220,6 +225,7 @@ def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
 # apply_color_relief (mocked gdaldem)
 # ---------------------------------------------------------------------------
 
+
 def _fake_gdaldem(cmd, capture_output=False, **kwargs):
     """Simulate gdaldem / gdal_translate subprocess calls."""
     output_path = cmd[-1]
@@ -243,6 +249,7 @@ def _fake_gdaldem(cmd, capture_output=False, **kwargs):
     elif cmd[0] == "gdal_translate":
         # PNG conversion step
         from PIL import Image as _Image
+
         in_ds = gdal.Open(cmd[-2]) if not cmd[-2].endswith(".png") else None
         out_w = in_ds.RasterXSize if in_ds else 10
         out_h = in_ds.RasterYSize if in_ds else 10
@@ -253,37 +260,67 @@ def _fake_gdaldem(cmd, capture_output=False, **kwargs):
     return mock_result
 
 
-@patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
-def test_color_relief_produces_file(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
+@patch("relievo.mask.subprocess.run", side_effect=_fake_gdaldem)
+def test_color_relief_produces_file(
+    mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file
+):
     """apply_color_relief debe crear el PNG de salida."""
     output = str(tmp_path / "colored.png")
-    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
-                       src_min=0.0, src_max=3000.0)
+    apply_color_relief(
+        synthetic_png,
+        synthetic_dem,
+        synthetic_dem,
+        color_ramp_file,
+        output,
+        src_min=0.0,
+        src_max=3000.0,
+    )
     import os
+
     assert os.path.isfile(output)
     img = Image.open(output)
     assert img.mode == "RGB"
 
 
-@patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
-def test_color_relief_output_size_matches_render(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
+@patch("relievo.mask.subprocess.run", side_effect=_fake_gdaldem)
+def test_color_relief_output_size_matches_render(
+    mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file
+):
     """El PNG de salida debe tener las mismas dimensiones que el render."""
     output = str(tmp_path / "colored.png")
     render_w, render_h = Image.open(synthetic_png).size
-    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
-                       src_min=0.0, src_max=3000.0)
+    apply_color_relief(
+        synthetic_png,
+        synthetic_dem,
+        synthetic_dem,
+        color_ramp_file,
+        output,
+        src_min=0.0,
+        src_max=3000.0,
+    )
     out_w, out_h = Image.open(output).size
     assert (out_w, out_h) == (render_w, render_h)
 
 
-@patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
-def test_color_relief_mode_separate(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
+@patch("relievo.mask.subprocess.run", side_effect=_fake_gdaldem)
+def test_color_relief_mode_separate(
+    mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file
+):
     """mode='separate' saves the raw colour PNG to <stem>_color.png; render is untouched."""
     import os
+
     output = str(tmp_path / "colored.png")
     color_output = str(tmp_path / "colored_color.png")
-    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
-                       src_min=0.0, src_max=3000.0, mode="separate")
+    apply_color_relief(
+        synthetic_png,
+        synthetic_dem,
+        synthetic_dem,
+        color_ramp_file,
+        output,
+        src_min=0.0,
+        src_max=3000.0,
+        mode="separate",
+    )
     # render PNG must NOT be created/overwritten
     assert not os.path.isfile(output), "separate mode must not write to the render output path"
     # colour layer must exist at <stem>_color.png
@@ -292,21 +329,33 @@ def test_color_relief_mode_separate(mock_run, tmp_path, synthetic_png, synthetic
     assert img.mode == "RGB"
 
 
-@patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
+@patch("relievo.mask.subprocess.run", side_effect=_fake_gdaldem)
 def test_color_relief_mode_both(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
     """mode='both' genera el PNG combinado y el PNG de color por separado."""
     import os
+
     output = str(tmp_path / "colored.png")
-    apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
-                       src_min=0.0, src_max=3000.0, mode="both")
+    apply_color_relief(
+        synthetic_png,
+        synthetic_dem,
+        synthetic_dem,
+        color_ramp_file,
+        output,
+        src_min=0.0,
+        src_max=3000.0,
+        mode="both",
+    )
     assert os.path.isfile(output)
     color_only = str(tmp_path / "colored_color.png")
     assert os.path.isfile(color_only)
 
 
-@patch("blender_relief.mask.subprocess.run")
-def test_color_relief_gdaldem_failure_raises(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
+@patch("relievo.mask.subprocess.run")
+def test_color_relief_gdaldem_failure_raises(
+    mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file
+):
     """Si gdaldem falla, debe lanzar RuntimeError."""
+
     def side_effect(cmd, capture_output=False, **kwargs):
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -315,5 +364,12 @@ def test_color_relief_gdaldem_failure_raises(mock_run, tmp_path, synthetic_png, 
 
     mock_run.side_effect = side_effect
     with pytest.raises(RuntimeError, match="gdaldem color-relief failed"):
-        apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file,
-                           str(tmp_path / "out.png"), src_min=0.0, src_max=3000.0)
+        apply_color_relief(
+            synthetic_png,
+            synthetic_dem,
+            synthetic_dem,
+            color_ramp_file,
+            str(tmp_path / "out.png"),
+            src_min=0.0,
+            src_max=3000.0,
+        )

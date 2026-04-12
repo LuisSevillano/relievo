@@ -35,7 +35,7 @@ jobs:
           pip install gdal==$(gdal-config --version)
 
       - name: Lint with ruff
-        run: ruff check blender_relief/ tests/
+        run: ruff check relievo/ tests/
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
@@ -55,4 +55,4 @@ jobs:
         run: pip install ruff
 
       - name: Lint
-        run: ruff check blender_relief/ tests/
+        run: ruff check relievo/ tests/

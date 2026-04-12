@@ -1,10 +1,8 @@
-"""Main CLI entry point for blender-relief."""
+"""Main CLI entry point for relievo."""
 
 import os
 import pathlib
 import shutil
-import subprocess
-import sys
 import tempfile
 import time
 
@@ -33,10 +31,10 @@ def _load_config(ctx, param, value):
     if value is None or ctx.resilient_parsing:
         return
     try:
-        import tomllib          # Python 3.11+
+        import tomllib  # Python 3.11+
     except ImportError:
         try:
-            import tomli as tomllib   # pip install tomli
+            import tomli as tomllib  # pip install tomli
         except ImportError:
             raise click.UsageError(
                 "tomli is required to read config files on Python < 3.11. "
@@ -65,20 +63,29 @@ def _find_blender(blender_bin: str) -> str:
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.version_option(__version__, "-V", "--version", prog_name="blender-relief")
+@click.version_option(__version__, "-V", "--version", prog_name="relievo")
 @click.option(
-    "--config", type=click.Path(exists=True), is_eager=True, expose_value=False,
+    "--config",
+    type=click.Path(exists=True),
+    is_eager=True,
+    expose_value=False,
     callback=_load_config,
     help="TOML config file with default option values. Keys must match option names (underscores). "
-         "Command-line arguments always take precedence.",
+    "Command-line arguments always take precedence.",
 )
 @click.option(
-    "--list-demtypes", is_flag=True, default=False, expose_value=False,
-    is_eager=True, callback=_print_demtypes,
+    "--list-demtypes",
+    is_flag=True,
+    default=False,
+    expose_value=False,
+    is_eager=True,
+    callback=_print_demtypes,
     help="List all available DEM datasets and exit.",
 )
 @click.option(
-    "--bbox", default=None, type=click.Path(exists=True),
+    "--bbox",
+    default=None,
+    type=click.Path(exists=True),
     help=(
         "GeoJSON file with bounding box polygon in WGS84. "
         "Required when downloading from OpenTopography (no --dem). "
@@ -86,55 +93,75 @@ def _find_blender(blender_bin: str) -> str:
     ),
 )
 @click.option(
-    "--template", required=True, type=click.Path(exists=True),
+    "--template",
+    required=True,
+    type=click.Path(exists=True),
     help="Path to the .blend template file.",
 )
 @click.option(
-    "--output", required=True, type=click.Path(),
+    "--output",
+    required=True,
+    type=click.Path(),
     help="Output PNG file path.",
 )
 @click.option(
-    "--buffer", default=0.05, show_default=True, type=click.FloatRange(0.0, 1.0),
+    "--buffer",
+    default=0.05,
+    show_default=True,
+    type=click.FloatRange(0.0, 1.0),
     help="Buffer applied to the bbox before downloading, as a fraction of its size (e.g. 0.05 = 5%). "
-         "Ensures no data is lost at the edges after reprojection.",
+    "Ensures no data is lost at the edges after reprojection.",
 )
 @click.option(
-    "--dem", type=click.Path(exists=True), default=None,
+    "--dem",
+    type=click.Path(exists=True),
+    default=None,
     help="Path to an existing DEM GeoTIFF. If omitted, downloads from OpenTopography.",
 )
 @click.option(
-    "--save-dem", type=click.Path(), default=None,
+    "--save-dem",
+    type=click.Path(),
+    default=None,
     help="Save the raw downloaded DEM to this path (before reprojection/crop). "
-         "Reuse later with --dem to skip re-downloading.",
+    "Reuse later with --dem to skip re-downloading.",
 )
 @click.option(
-    "--save-processed-dem", type=click.Path(), default=None,
+    "--save-processed-dem",
+    type=click.Path(),
+    default=None,
     help="Save the processed DEM (after reprojection and crop, in real metres) to this path. "
-         "Useful for inspecting the exact raster that Blender renders, or for reuse with --dem "
-         "when you always apply the same --crs and --bbox.",
+    "Useful for inspecting the exact raster that Blender renders, or for reuse with --dem "
+    "when you always apply the same --crs and --bbox.",
 )
 @click.option(
-    "--crs", default=None,
+    "--crs",
+    default=None,
     help="Target CRS for DEM reprojection (e.g. EPSG:3857, EPSG:32628). "
-         "If omitted, the DEM is used as-is with no reprojection.",
+    "If omitted, the DEM is used as-is with no reprojection.",
 )
 @click.option(
-    "--demtype", default="SRTMGL1", show_default=True,
+    "--demtype",
+    default="SRTMGL1",
+    show_default=True,
     type=click.Choice(list(DEM_DATASETS.keys()), case_sensitive=True),
     help=(
         "OpenTopography dataset. Available options:\n\n"
         + "\n".join(
-            f"  {code:<18} {name}  ({arcsec}\" / ~{arcsec * 30}m)"
+            f'  {code:<18} {name}  ({arcsec}" / ~{arcsec * 30}m)'
             for code, (name, arcsec, _) in DEM_DATASETS.items()
         )
     ),
 )
 @click.option(
-    "--api-key", envvar="OPENTOPO_API_KEY", default=None,
+    "--api-key",
+    envvar="OPENTOPO_API_KEY",
+    default=None,
     help="OpenTopography API key. Can also be set via OPENTOPO_API_KEY env var.",
 )
 @click.option(
-    "--smooth", default=None, type=click.FloatRange(min=1.0, min_open=True),
+    "--smooth",
+    default=None,
+    type=click.FloatRange(min=1.0, min_open=True),
     help=(
         "DEM smoothing factor. Downsamples the DEM by this factor (average) then upsamples "
         "back (bilinear) to blur terrain detail before rendering. "
@@ -143,39 +170,57 @@ def _find_blender(blender_bin: str) -> str:
     ),
 )
 @click.option(
-    "--exaggeration", default=None, type=float,
+    "--exaggeration",
+    default=None,
+    type=float,
     help="Vertical exaggeration factor (Displacement node Scale). "
-         "If omitted, uses the template's value. Try 0.5 to flatten, 2.0 to emphasise relief.",
+    "If omitted, uses the template's value. Try 0.5 to flatten, 2.0 to emphasise relief.",
 )
 @click.option(
-    "--samples", default=None, type=int,
+    "--samples",
+    default=None,
+    type=int,
     help="Number of Cycles render samples. If omitted, uses the template's value.",
 )
 @click.option(
-    "--max-size", default=None, type=int,
+    "--max-size",
+    default=None,
+    type=int,
     help="Maximum pixels on the longest side of the render output. "
-         "If omitted, uses the resolution set in the .blend template. Aspect ratio is always preserved.",
+    "If omitted, uses the resolution set in the .blend template. Aspect ratio is always preserved.",
 )
 @click.option(
-    "--scale", default=100, show_default=True, type=click.IntRange(1, 100),
+    "--scale",
+    default=100,
+    show_default=True,
+    type=click.IntRange(1, 100),
     help="Render resolution percentage (1–100), applied after --max-size. Use 25 or 50 for quick previews.",
 )
 @click.option(
-    "--light-azimuth", default=None, type=float,
+    "--light-azimuth",
+    default=None,
+    type=float,
     help="Sun azimuth in degrees (0 = North, clockwise). If omitted, uses the template's value.",
 )
 @click.option(
-    "--light-altitude", default=None, type=float,
+    "--light-altitude",
+    default=None,
+    type=float,
     help="Sun altitude (elevation) in degrees (0 = horizon, 90 = overhead). If omitted, uses the template's value.",
 )
 @click.option(
-    "--color-relief", "color_ramp", type=click.Path(exists=True), default=None,
+    "--color-relief",
+    "color_ramp",
+    type=click.Path(exists=True),
+    default=None,
     help="Path to a gdaldem colour ramp file. Applies a hypsometric tint over the render. Requires gdaldem on PATH.",
 )
 @click.option(
-    "--color-relief-mode", "color_relief_mode",
+    "--color-relief-mode",
+    "color_relief_mode",
     type=click.Choice(["overlay", "separate", "both"], case_sensitive=False),
-    default="overlay", show_default=True,
+    default="overlay",
+    show_default=True,
     help=(
         "How to output the colour relief layer. "
         "'overlay' multiplies the tint onto the render (default). "
@@ -184,37 +229,70 @@ def _find_blender(blender_bin: str) -> str:
     ),
 )
 @click.option(
-    "--clip-mask", is_flag=True, default=False,
+    "--clip-mask",
+    is_flag=True,
+    default=False,
     help="Clip the output PNG to the GeoJSON polygon shape. "
-         "Pixels outside the polygon become transparent (RGBA output).",
+    "Pixels outside the polygon become transparent (RGBA output).",
 )
 @click.option(
-    "--dry-run", is_flag=True, default=False,
+    "--dry-run",
+    is_flag=True,
+    default=False,
     help="Print what would be downloaded and rendered, then exit without doing anything.",
 )
 @click.option(
-    "--no-render", is_flag=True, default=False,
+    "--no-render",
+    is_flag=True,
+    default=False,
     help="Download and process the DEM but skip the Blender render step. "
-         "Use --save-dem to keep the processed DEM.",
+    "Use --save-dem to keep the processed DEM.",
 )
 @click.option(
-    "--blender", "blender_bin", default="blender", show_default=True,
+    "--blender",
+    "blender_bin",
+    default="blender",
+    show_default=True,
     help="Path to the Blender executable.",
 )
 @click.option(
-    "--verbose", is_flag=True, default=False,
+    "--verbose",
+    is_flag=True,
+    default=False,
     help="Print detailed progress, including GDAL steps and the full Blender log.",
 )
 @click.option(
-    "--keep-workdir", is_flag=True, default=False,
+    "--keep-workdir",
+    is_flag=True,
+    default=False,
     help="Do not delete the temporary working directory after render.",
 )
 def main(
-    bbox, template, output, buffer, dem, save_dem, save_processed_dem, crs, demtype, api_key,
-    smooth, exaggeration, samples, max_size, scale,
-    light_azimuth, light_altitude, color_ramp, color_relief_mode, clip_mask,
-    dry_run, no_render,
-    verbose, blender_bin, keep_workdir,
+    bbox,
+    template,
+    output,
+    buffer,
+    dem,
+    save_dem,
+    save_processed_dem,
+    crs,
+    demtype,
+    api_key,
+    smooth,
+    exaggeration,
+    samples,
+    max_size,
+    scale,
+    light_azimuth,
+    light_altitude,
+    color_ramp,
+    color_relief_mode,
+    clip_mask,
+    dry_run,
+    no_render,
+    verbose,
+    blender_bin,
+    keep_workdir,
 ):
     """Create a shaded relief PNG from a DEM using Blender.
 
@@ -229,19 +307,19 @@ def main(
     \b
     Quick examples:
       # Download and render
-      blender-relief --api-key $KEY --bbox region.geojson \\
+      relievo --api-key $KEY --bbox region.geojson \\
                      --template relief.blend --output out.png
 
       # Use local DEM, crop to bbox
-      blender-relief --dem local.tif --bbox region.geojson \\
+      relievo --dem local.tif --bbox region.geojson \\
                      --template relief.blend --output out.png
 
       # Reproject + hypsometric tint
-      blender-relief --dem local.tif --crs EPSG:25831 \\
+      relievo --dem local.tif --crs EPSG:25831 \\
                      --color-relief ramp.txt --template relief.blend --output out.png
 
       # Config file
-      blender-relief --config myprofile.toml --output out.png
+      relievo --config myprofile.toml --output out.png
     """
     log.setup(verbose)
 
@@ -257,9 +335,22 @@ def main(
 
     # --- Dry run ---
     if dry_run:
-        _print_dry_run(bbox_abs, dem, demtype, crs, buffer, output_abs,
-                       max_size, scale, light_azimuth, light_altitude,
-                       color_ramp, color_relief_mode, clip_mask, no_render)
+        _print_dry_run(
+            bbox_abs,
+            dem,
+            demtype,
+            crs,
+            buffer,
+            output_abs,
+            max_size,
+            scale,
+            light_azimuth,
+            light_altitude,
+            color_ramp,
+            color_relief_mode,
+            clip_mask,
+            no_render,
+        )
         return
 
     # Validate blender early (skip for --no-render)
@@ -277,14 +368,16 @@ def main(
         )
 
     if no_render and not save_dem:
-        log.info("Note: --no-render is set but --save-dem was not provided. "
-                 "The processed DEM will be lost when the working directory is cleaned up.")
+        log.info(
+            "Note: --no-render is set but --save-dem was not provided. "
+            "The processed DEM will be lost when the working directory is cleaned up."
+        )
 
     if no_render and clip_mask:
         log.info("Note: --clip-mask has no effect when --no-render is set (nothing to clip).")
 
     t_start = time.monotonic()
-    workdir = tempfile.mkdtemp(prefix="blender-relief-")
+    workdir = tempfile.mkdtemp(prefix="relievo-")
     log.debug(f"Working directory: {workdir}")
 
     try:
@@ -292,10 +385,12 @@ def main(
         if bbox_abs:
             bbox_wgs84 = extract_wgs84_bbox(bbox_abs)
             west, south, east, north = bbox_wgs84
-            log.debug(f"Bounding box (WGS84): W={west:.4f} S={south:.4f} E={east:.4f} N={north:.4f}")
+            log.debug(
+                f"Bounding box (WGS84): W={west:.4f} S={south:.4f} E={east:.4f} N={north:.4f}"
+            )
         else:
             bbox_wgs84 = None
-            log.debug("Sin bbox — se renderizará el DEM completo")
+            log.debug("Sin bbox - se renderizará el DEM completo")
 
         # Download DEM if not provided
         if dem is None:
@@ -329,8 +424,11 @@ def main(
         if no_render:
             elapsed = time.monotonic() - t_start
             m, s = divmod(int(elapsed), 60)
-            log.info(f"DEM processed  →  {result.dem_path}  ({m}m {s}s)" if m else
-                     f"DEM processed  →  {result.dem_path}  ({s}s)")
+            log.info(
+                f"DEM processed  →  {result.dem_path}  ({m}m {s}s)"
+                if m
+                else f"DEM processed  →  {result.dem_path}  ({s}s)"
+            )
             return
 
         # Render in Blender
@@ -354,14 +452,19 @@ def main(
         # Post-processing: color relief first, then clip mask
         if color_ramp:
             from .mask import apply_color_relief
+
             color_ramp_abs = str(pathlib.Path(color_ramp).resolve())
             log.info("Applying color relief...")
             # Use source_dem_path (real elevation values in metres), not the
             # UInt16-rescaled dem_blender.tif, so the ramp elevations match.
             apply_color_relief(
-                output_abs, result.source_dem_path, result.dem_path,
-                color_ramp_abs, output_abs,
-                src_min=result.src_min, src_max=result.src_max,
+                output_abs,
+                result.source_dem_path,
+                result.dem_path,
+                color_ramp_abs,
+                output_abs,
+                src_min=result.src_min,
+                src_max=result.src_max,
                 mode=color_relief_mode,
             )
 
@@ -370,6 +473,7 @@ def main(
                 log.info("Aviso: --clip-mask ignorado (requiere --bbox).")
             else:
                 from .mask import apply_clip_mask
+
                 log.info("Applying clip mask...")
                 apply_clip_mask(output_abs, result.dem_path, bbox_abs, output_abs)
 
@@ -386,14 +490,25 @@ def main(
 
 
 def _print_dry_run(
-    bbox_abs, dem, demtype, crs, buffer, output_abs,
-    max_size, scale, light_azimuth, light_altitude,
-    color_ramp, color_relief_mode, clip_mask, no_render,
+    bbox_abs,
+    dem,
+    demtype,
+    crs,
+    buffer,
+    output_abs,
+    max_size,
+    scale,
+    light_azimuth,
+    light_altitude,
+    color_ramp,
+    color_relief_mode,
+    clip_mask,
+    no_render,
 ):
     """Print a summary of what would happen, then exit."""
-    from .download import estimate_pixels, extract_wgs84_bbox, buffer_bbox, DEM_DATASETS
+    from .download import DEM_DATASETS, buffer_bbox, extract_wgs84_bbox
 
-    click.echo("Dry run — nothing will be downloaded or rendered.")
+    click.echo("Dry run - nothing will be downloaded or rendered.")
     click.echo()
 
     bbox_wgs84 = extract_wgs84_bbox(bbox_abs)
@@ -401,22 +516,23 @@ def _print_dry_run(
 
     if dem:
         click.echo(f"  DEM source:        Local file: {dem}")
-        px_info = "(use --verbose or omit --dry-run to see pixel dimensions)"
     else:
         download_bbox = buffer_bbox(bbox_wgs84, buffer) if buffer > 0 else bbox_wgs84
         bw, bs, be, bn = download_bbox
         click.echo(f"  BBox (original):   W={west:.4f}  S={south:.4f}  E={east:.4f}  N={north:.4f}")
         if buffer > 0:
-            click.echo(f"  BBox (buffered):   W={bw:.4f}  S={bs:.4f}  E={be:.4f}  N={bn:.4f}  (+{buffer*100:.0f}%)")
+            click.echo(
+                f"  BBox (buffered):   W={bw:.4f}  S={bs:.4f}  E={be:.4f}  N={bn:.4f}  (+{buffer * 100:.0f}%)"
+            )
         px_x, px_y = estimate_pixels(download_bbox, demtype)
         name, arcsec, _ = DEM_DATASETS.get(demtype, (demtype, "?", 0))
-        click.echo(f"  DEM type:          {demtype}  ({name}, {arcsec}\" / ~{arcsec*30}m)")
+        click.echo(f'  DEM type:          {demtype}  ({name}, {arcsec}" / ~{arcsec * 30}m)')
         click.echo(f"  Estimated pixels:  {px_x} × {px_y}")
         plane_x = px_x / 1000.0
         plane_y = px_y / 1000.0
         click.echo(f"  Blender plane:     {plane_x:.3f} × {plane_y:.3f} units")
 
-    click.echo(f"  CRS:               {crs if crs else '(none — no reprojection)'}")
+    click.echo(f"  CRS:               {crs if crs else '(none - no reprojection)'}")
 
     res_note = f"{max_size}px longest side" if max_size else "(from template)"
     click.echo(f"  Render resolution: {res_note}  @ {scale}%")
@@ -427,9 +543,9 @@ def _print_dry_run(
     if color_ramp:
         click.echo(f"  Color relief:      {color_ramp}  (mode: {color_relief_mode})")
     if clip_mask:
-        click.echo(f"  Clip mask:         enabled")
+        click.echo("  Clip mask:         enabled")
     if no_render:
-        click.echo(f"  Render:            skipped (--no-render)")
+        click.echo("  Render:            skipped (--no-render)")
 
     click.echo()
     click.echo(f"  Output:            {output_abs}")

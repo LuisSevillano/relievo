@@ -1,4 +1,4 @@
-"""Tests for cli.py — full CLI with mocked I/O operations.
+"""Tests for cli.py - full CLI with mocked I/O operations.
 
 Uses click.testing.CliRunner and unittest.mock.patch to avoid any real
 network, GDAL, or Blender calls. All tests run offline.
@@ -7,15 +7,14 @@ network, GDAL, or Blender calls. All tests run offline.
 import json
 import os
 import shutil
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
 
-from blender_relief.cli import main
-from blender_relief.download import DEM_DATASETS
-from blender_relief.process import ProcessResult
-
+from relievo.cli import main
+from relievo.download import DEM_DATASETS
+from relievo.process import ProcessResult
 
 # ---------------------------------------------------------------------------
 # Shared helpers / factories
@@ -143,11 +142,11 @@ def test_demtype_invalid(runner, tmp_path, bbox_file, template_file):
 @pytest.mark.parametrize("demtype", list(DEM_DATASETS.keys()))
 def test_all_valid_demtypes_accepted(runner, tmp_path, bbox_file, template_file, demtype):
     """Every dataset code in DEM_DATASETS should be accepted by the CLI."""
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.download_dem"), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.download_dem"), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -188,7 +187,7 @@ def test_scale_101_invalid(runner, tmp_path, bbox_file, template_file):
 
 def test_missing_api_key_without_dem(runner, tmp_path, bbox_file, template_file):
     """When --dem is not provided, --api-key (or OPENTOPO_API_KEY) must be present."""
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -200,10 +199,10 @@ def test_missing_api_key_without_dem(runner, tmp_path, bbox_file, template_file)
 
 def test_api_key_not_required_with_local_dem(runner, tmp_path, bbox_file, template_file, local_dem_file):
     """When --dem is provided, no API key is needed."""
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -255,7 +254,7 @@ def test_dry_run_shows_output_path(runner, tmp_path, bbox_file, template_file):
 
 def test_dry_run_does_not_download(runner, tmp_path, bbox_file, template_file):
     """--dry-run must not call download_dem."""
-    with patch("blender_relief.cli.download_dem") as mock_dl:
+    with patch("relievo.cli.download_dem") as mock_dl:
         runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -295,9 +294,9 @@ def test_dry_run_combined_with_no_render(runner, tmp_path, bbox_file, template_f
 # ---------------------------------------------------------------------------
 
 def test_no_render_skips_render_call(runner, tmp_path, bbox_file, template_file, local_dem_file):
-    with patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render") as mock_render:
+    with patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render") as mock_render:
         runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -309,8 +308,8 @@ def test_no_render_skips_render_call(runner, tmp_path, bbox_file, template_file,
 
 
 def test_no_render_warns_without_save_dem(runner, tmp_path, bbox_file, template_file, local_dem_file):
-    with patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)):
+    with patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -322,8 +321,8 @@ def test_no_render_warns_without_save_dem(runner, tmp_path, bbox_file, template_
 
 
 def test_no_render_with_clip_mask_warns(runner, tmp_path, bbox_file, template_file, local_dem_file):
-    with patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)):
+    with patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -349,11 +348,11 @@ def test_keep_workdir_preserves_directory(runner, tmp_path, bbox_file, template_
         created_dirs.append(d)
         return d
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"), \
-         patch("blender_relief.cli.tempfile.mkdtemp", side_effect=capturing_mkdtemp):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"), \
+         patch("relievo.cli.tempfile.mkdtemp", side_effect=capturing_mkdtemp):
         runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -376,11 +375,11 @@ def test_workdir_cleaned_up_by_default(runner, tmp_path, bbox_file, template_fil
         created_dirs.append(d)
         return d
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"), \
-         patch("blender_relief.cli.tempfile.mkdtemp", side_effect=capturing_mkdtemp):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"), \
+         patch("relievo.cli.tempfile.mkdtemp", side_effect=capturing_mkdtemp):
         runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -398,11 +397,11 @@ def test_workdir_cleaned_up_by_default(runner, tmp_path, bbox_file, template_fil
 
 def test_save_dem_copies_file(runner, tmp_path, bbox_file, template_file):
     save_path = str(tmp_path / "saved.tif")
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.download_dem", side_effect=lambda bbox, dt, key, path, **kw: open(path, "wb").write(b"TIFF")), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.download_dem", side_effect=lambda bbox, dt, key, path, **kw: open(path, "wb").write(b"TIFF")), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -419,11 +418,11 @@ def test_save_dem_copies_file(runner, tmp_path, bbox_file, template_file):
 # ---------------------------------------------------------------------------
 
 def test_local_dem_skips_download(runner, tmp_path, bbox_file, template_file, local_dem_file):
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.download_dem") as mock_dl, \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.download_dem") as mock_dl, \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"):
         runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -444,10 +443,10 @@ def test_config_overrides_defaults(runner, tmp_path, bbox_file, template_file, l
     def fake_render(**kwargs):
         captured.update(kwargs)
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=fake_render):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=fake_render):
         result = runner.invoke(main, [
             "--config", toml_config,
             "--bbox", str(bbox_file),
@@ -468,10 +467,10 @@ def test_cli_args_override_config(runner, tmp_path, bbox_file, template_file, lo
     def fake_render(**kwargs):
         captured.update(kwargs)
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=fake_render):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=fake_render):
         result = runner.invoke(main, [
             "--config", toml_config,
             "--bbox", str(bbox_file),
@@ -516,10 +515,10 @@ def test_light_args_passed_to_render(runner, tmp_path, bbox_file, template_file,
     def fake_render(**kwargs):
         captured.update(kwargs)
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=fake_render):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=fake_render):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),
@@ -539,10 +538,10 @@ def test_light_azimuth_only(runner, tmp_path, bbox_file, template_file, local_de
     def fake_render(**kwargs):
         captured.update(kwargs)
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=fake_render):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=fake_render):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -560,10 +559,10 @@ def test_light_azimuth_only(runner, tmp_path, bbox_file, template_file, local_de
 def test_exaggeration_passed_to_render(runner, tmp_path, bbox_file, template_file, local_dem_file):
     captured = {}
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=lambda **kw: captured.update(kw)):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=lambda **kw: captured.update(kw)):
         runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -575,10 +574,10 @@ def test_exaggeration_passed_to_render(runner, tmp_path, bbox_file, template_fil
 def test_samples_passed_to_render(runner, tmp_path, bbox_file, template_file, local_dem_file):
     captured = {}
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=lambda **kw: captured.update(kw)):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=lambda **kw: captured.update(kw)):
         runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -590,10 +589,10 @@ def test_samples_passed_to_render(runner, tmp_path, bbox_file, template_file, lo
 def test_max_size_passed_to_render(runner, tmp_path, bbox_file, template_file, local_dem_file):
     captured = {}
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render", side_effect=lambda **kw: captured.update(kw)):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render", side_effect=lambda **kw: captured.update(kw)):
         runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -616,11 +615,11 @@ def test_color_relief_nonexistent_file(runner, tmp_path, bbox_file, template_fil
 
 
 def test_color_relief_calls_apply(runner, tmp_path, bbox_file, template_file, local_dem_file, color_ramp_file):
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"), \
-         patch("blender_relief.mask.apply_color_relief") as mock_cr:
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"), \
+         patch("relievo.mask.apply_color_relief") as mock_cr:
         result = runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -635,11 +634,11 @@ def test_color_relief_calls_apply(runner, tmp_path, bbox_file, template_file, lo
 # ---------------------------------------------------------------------------
 
 def test_clip_mask_calls_apply(runner, tmp_path, bbox_file, template_file, local_dem_file):
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"), \
-         patch("blender_relief.mask.apply_clip_mask") as mock_cm:
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"), \
+         patch("relievo.mask.apply_clip_mask") as mock_cm:
         result = runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -659,12 +658,12 @@ def test_color_relief_before_clip_mask(runner, tmp_path, bbox_file, template_fil
     def fake_cm(*args, **kwargs):
         call_order.append("clip_mask")
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"), \
-         patch("blender_relief.mask.apply_color_relief", side_effect=fake_cr), \
-         patch("blender_relief.mask.apply_clip_mask", side_effect=fake_cm):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"), \
+         patch("relievo.mask.apply_color_relief", side_effect=fake_cr), \
+         patch("relievo.mask.apply_clip_mask", side_effect=fake_cm):
         runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -687,10 +686,10 @@ def test_crs_none_skips_warp(runner, tmp_path, bbox_file, template_file, local_d
         captured.update(kwargs)
         return _make_process_result(tmp_path)
 
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", side_effect=fake_process), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", side_effect=fake_process), \
+         patch("relievo.cli.render"):
         runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -703,10 +702,10 @@ def test_crs_none_skips_warp(runner, tmp_path, bbox_file, template_file, local_d
 # ---------------------------------------------------------------------------
 
 def test_elapsed_time_shown(runner, tmp_path, bbox_file, template_file, local_dem_file):
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"), "--dem", str(local_dem_file),
@@ -722,11 +721,11 @@ def test_elapsed_time_shown(runner, tmp_path, bbox_file, template_file, local_de
 
 def test_buffer_zero(runner, tmp_path, bbox_file, template_file):
     """--buffer 0.0 should be accepted without error."""
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.download_dem", side_effect=lambda bbox, dt, key, path, **kw: open(path, "wb").write(b"T")), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render"):
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.download_dem", side_effect=lambda bbox, dt, key, path, **kw: open(path, "wb").write(b"T")), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render"):
         result = runner.invoke(main, [
             "--bbox", str(bbox_file), "--template", str(template_file),
             "--output", str(tmp_path / "out.png"),
@@ -750,10 +749,10 @@ def test_buffer_invalid_above_one(runner, tmp_path, bbox_file, template_file):
 
 def test_full_pipeline_mocked(runner, tmp_path, bbox_file, template_file, local_dem_file):
     """Verify the happy path runs to completion with all mocks in place."""
-    with patch("blender_relief.cli._find_blender", return_value="/usr/bin/blender"), \
-         patch("blender_relief.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
-         patch("blender_relief.cli.process_dem", return_value=_make_process_result(tmp_path)), \
-         patch("blender_relief.cli.render") as mock_render:
+    with patch("relievo.cli._find_blender", return_value="/usr/bin/blender"), \
+         patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)), \
+         patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)), \
+         patch("relievo.cli.render") as mock_render:
         result = runner.invoke(main, [
             "--bbox", str(bbox_file),
             "--template", str(template_file),

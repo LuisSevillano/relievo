@@ -1,11 +1,10 @@
-"""Shared pytest fixtures for blender-relief tests."""
+"""Shared pytest fixtures for relievo tests."""
 
 import json
 import struct
 import zlib
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # GeoJSON fixtures
@@ -84,7 +83,7 @@ def _make_png_bytes(width: int, height: int, color=(128, 128, 128)) -> bytes:
     ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
     ihdr = chunk(b"IHDR", ihdr_data)
 
-    # IDAT — uncompressed scanlines with filter byte 0
+    # IDAT - uncompressed scanlines with filter byte 0
     r, g, b = color
     scanline = bytes([0] + [r, g, b] * width)
     raw = scanline * height

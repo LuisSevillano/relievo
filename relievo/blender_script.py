@@ -1,9 +1,9 @@
-"""Blender bpy script — runs inside Blender's Python interpreter.
+"""Blender bpy script - runs inside Blender's Python interpreter.
 
 This script is passed to Blender via:
   blender --background template.blend --python blender_script.py -- [args]
 
-It must be entirely self-contained: no access to the blender_relief package
+It must be entirely self-contained: no access to the relievo package
 or its pip dependencies, since it runs inside Blender's bundled Python.
 
 Template assumptions (must be set up once manually in Blender GUI):
@@ -152,7 +152,7 @@ def main() -> None:
             sun.rotation_euler = (math.radians(90.0 - alt), 0.0, math.radians(az))
             print(f"Sun light: azimuth={az:.1f}° altitude={alt:.1f}°")
         else:
-            print("Warning: no SUN lamp found in template — --light-azimuth/--light-altitude ignored.")
+            print("Warning: no SUN lamp found in template - --light-azimuth/--light-altitude ignored.")
 
     scene.render.filepath = args.output
     scene.render.image_settings.file_format = "PNG"

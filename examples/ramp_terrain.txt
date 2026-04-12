@@ -2,7 +2,7 @@
 # Format: elevation_m  R  G  B
 #
 # Usage:
-#   blender-relief --bbox region.geojson --template relief.blend \
+#   relievo --bbox region.geojson --template relief.blend \
 #     --output out.png --color-relief examples/ramp_terrain.txt
 #
 # Adjust elevation values to match your area's elevation range.
