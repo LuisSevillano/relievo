@@ -148,7 +148,8 @@ Options:
   --output FILE                Output PNG file path.  [default: output.png]
   --buffer FLOAT               Buffer added to bbox before downloading (e.g. 0.05 = 5%).
   --dem FILE                   Local DEM GeoTIFF — skips the download step entirely.
-  --save-dem FILE              Save the processed DEM for later reuse with --dem.
+  --save-dem FILE              Save the processed UInt16 DEM for later reuse with --dem.
+  --save-processed-dem FILE    Save a copy of the DEM in real metres (before UInt16 conversion).
   --crs TEXT                   Reproject DEM to this CRS before rendering (e.g. EPSG:32628).
   --demtype TEXT               OpenTopography dataset key.  [default: SRTMGL1]
   --api-key TEXT               OpenTopography API key (or OPENTOPO_API_KEY env var).
@@ -405,7 +406,8 @@ blender-relief \
   --bbox examples/tenerife_bbox.geojson \
   --template tenerife_template.blend \
   --no-render \
-  --save-dem dem_tenerife.tif
+  --save-dem dem_tenerife.tif \
+  --save-processed-dem dem_tenerife_metres.tif   # optional: metres copy for GIS inspection
 
 # Step 2 — render from saved DEM, no internet needed
 blender-relief \
@@ -423,6 +425,9 @@ blender-relief \
   --light-azimuth 135 --light-altitude 25 \
   --exaggeration 1.5
 ```
+
+> **`--save-dem`** saves the UInt16-rescaled DEM that Blender reads directly.  
+> **`--save-processed-dem`** saves a copy in real metres (float32 GeoTIFF) — handy for computing statistics, opening in QGIS or reusing in other tools. This file is never used by Blender directly.
 
 ---
 
@@ -662,8 +667,10 @@ blender-relief --list-datasets
 | `NASADEM` | NASADEM | ~30 m | 56°S – 60°N |
 | `COP30` | Copernicus DEM 30 m | ~30 m | Global |
 | `COP90` | Copernicus DEM 90 m | ~90 m | Global |
+| `SRTM15Plus` | SRTM15+ (bathymetric) | ~500 m | Global (ocean + land) |
 
-> Use `COP30` for areas outside SRTM coverage (Scandinavia, Alaska, high Arctic…).
+> Use `COP30` for areas outside SRTM coverage (Scandinavia, Alaska, high Arctic…).  
+> Use `SRTM15Plus` for ocean bathymetry — it's the only dataset with negative elevations below sea level.
 
 ---
 
@@ -691,7 +698,7 @@ blender-relief --api-key your_key_here ...
 
 **Render speed** — Cycles is GPU-accelerated. Configure Blender under *Preferences → System → Cycles Render Devices*. A 4 K render at 256 samples takes ~60 s on an RTX 3080; ~15 min CPU-only.
 
-**Aspect ratio** — If your DEM's aspect ratio differs from the template's render resolution, thin black bands may appear at the edges. Use `--max-size` to force the render resolution to match the DEM's natural proportions:
+**Aspect ratio** — The render resolution automatically adapts to the DEM's natural proportions. Use `--max-size` to control the longest side in pixels without distortion:
 
 ```bash
 blender-relief --bbox region.geojson --template relief.blend \

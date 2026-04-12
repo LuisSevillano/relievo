@@ -240,10 +240,10 @@ def main(
     output_abs = str(pathlib.Path(output).resolve())
     bbox_abs = str(pathlib.Path(bbox).resolve()) if bbox else None
 
-    # Validar que bbox esté presente cuando hace falta
+    # Validate bbox before anything else (including Blender lookup)
     if dem is None and not bbox:
         raise click.UsageError(
-            "--bbox es obligatorio cuando no se usa --dem (necesario para descargar de OpenTopography)."
+            "--bbox is required when --dem is not provided (needed to download from OpenTopography)."
         )
 
     # --- Dry run ---
