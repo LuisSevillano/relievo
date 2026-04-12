@@ -1,26 +1,28 @@
-# Hypsometric tint with bathymetric-style blues
-# Designed for arid/desert terrain with coastal areas (Persian Gulf / Gulf of Oman)
-# Elevation in metres (WGS84)
+# Hypsometric + bathymetric tint — Gulf of Oman / Persian Gulf
+# Requires a DEM with negative values (e.g. SRTM15Plus / GEBCO)
 #
-# Below sea level / NoData → transparent
-nv  0 0 0 0
-# Sea level (0 m) — deep ocean blue
-0     14  60 120
-# Shallow coastal water / near-shore (SRTM marks these as 0-1 m)
-1     30  90 155
-# Coastal lowlands — warm sandy transition
-10    80 155 180
-50   170 195 175
-# Low desert plains
-100  215 195 150
-300  200 178 128
-# Mid-altitude plateau
-600  180 155 108
-900  160 132  90
-# Mountain flanks
-1500 148 118  78
-2000 165 140 105
-# High peaks
-2500 195 175 150
-3000 225 215 200
-3500 245 240 235
+# nodata → transparent
+nv    0   0   0   0
+# --- Batimetría (valores negativos) ---
+-4000   5  15  60    # fondo oceánico profundo
+-3000  10  30  90    # océano profundo
+-2000  15  55 120    # aguas profundas
+-1000  20  80 150    # aguas intermedias
+ -500  30 110 175    # plataforma exterior
+ -200  45 140 195    # plataforma media
+  -80  70 165 210    # plataforma continental somera
+  -30  95 188 220    # aguas muy someras
+   -5 130 210 230    # batimetría costera / bahías
+# --- Transición precisa en la línea de costa ---
+    0 160 225 240    # nivel del mar exacto
+    1 215 195 155    # primer metro de tierra firme → tierra inmediatamente
+# --- Tierra: desierto árido ---
+   50 210 188 145
+  150 200 175 128
+  400 185 158 110
+  700 170 142  95
+ 1200 155 128  82
+ 1800 148 120  75
+ 2500 168 145 108
+ 3200 200 185 160
+ 3800 230 222 210

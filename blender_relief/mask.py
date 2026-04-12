@@ -157,16 +157,16 @@ def apply_clip_mask(
 
 
 def _rescale_ramp(ramp_path: str, src_min: float, src_max: float, out_path: str) -> None:
-    """Write a new gdaldem color ramp file with elevations rescaled to UInt16 (0–65535).
+    """Write a new gdaldem color ramp file with elevations rescaled to UInt16 [1–65535].
 
     ``dem_blender.tif`` stores rescaled values where:
-        uint16 = (elev - src_min) / (src_max - src_min) * 65535
+        uint16 = 1 + (elev - src_min) / (src_max - src_min) * 65534
 
-    This function rewrites the ramp so the elevation breakpoints match the
-    UInt16 pixel values in ``dem_blender.tif``.
+    UInt16 value 0 is reserved as the nodata sentinel (pixels with no
+    elevation data, e.g. outside the DEM extent). The ``nv`` entry in the
+    colour ramp handles those.
 
-    Lines starting with ``#`` are preserved as comments. The special ``nv``
-    (no-data) entry is also preserved verbatim.
+    Lines starting with ``#`` are preserved as comments.
     """
     scale = src_max - src_min if (src_max - src_min) != 0 else 1.0
     lines_out = []
@@ -185,8 +185,8 @@ def _rescale_ramp(ramp_path: str, src_min: float, src_max: float, out_path: str)
             except ValueError:
                 lines_out.append(line)
                 continue
-            uint16_val = (elev - src_min) / scale * 65535.0
-            uint16_val = max(0.0, min(65535.0, uint16_val))
+            uint16_val = 1.0 + (elev - src_min) / scale * 65534.0
+            uint16_val = max(1.0, min(65535.0, uint16_val))
             rest = " ".join(parts[1:])
             lines_out.append(f"{uint16_val:.2f} {rest}\n")
     with open(out_path, "w") as f:

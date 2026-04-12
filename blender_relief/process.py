@@ -120,13 +120,19 @@ def process_dem(
         proj_win = None
         log.debug("Rescaling to 16-bit (full DEM, no crop)...")
 
+    # Map real data to [1, 65535], reserving UInt16=0 as the nodata sentinel.
+    # This avoids collisions between nodata pixels and actual minimum-elevation
+    # pixels, and prevents the "nodata rounded/clamped" GDAL warning that occurs
+    # when the source nodata value (e.g. -32768 in SRTM15Plus) is out of the
+    # UInt16 range.
     ds = gdal.Translate(
         output_path, reprojected_path,
         options=gdal.TranslateOptions(
             outputType=gdal.GDT_UInt16,
-            scaleParams=[[src_min, src_max, 0, 65535]],
+            scaleParams=[[src_min, src_max, 1, 65535]],
             projWin=proj_win,
             format="GTiff",
+            noData=0,
         ),
     )
     if ds is None:
