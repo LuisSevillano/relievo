@@ -429,6 +429,7 @@ blender-relief \
 ### 10. Reproject to a metric CRS
 
 Reprojecting to a projected CRS reduces distortion, especially at high latitudes or for large areas.
+`--crs` accepts any string that GDAL understands: EPSG codes, PROJ strings, WKT, etc.
 
 ```bash
 # Tenerife → UTM zone 28N
@@ -444,7 +445,51 @@ blender-relief \
   --template tenerife_template.blend \
   --output norway.png \
   --crs EPSG:32633
+
+# Pyrenees → ETRS89 / UTM zone 31N (official projection for Spain & France in that band)
+blender-relief \
+  --bbox pirineos.geojson \
+  --dem pirineos.tif \
+  --template template.blend \
+  --output pirineos.png \
+  --crs EPSG:25831
 ```
+
+#### Custom PROJ string — Albers Equal Area for the Gulf of Oman
+
+For regions not covered by a standard EPSG code, or when you need a tailor-made
+equal-area projection, pass a full PROJ string.
+The example below uses Albers Equal Area centred on the Gulf of Oman / Iran,
+paired with a custom hypsometric ramp (`ramp_hormuz.txt`) that blends
+bathymetric blues at sea level into desert ochres at altitude:
+
+```bash
+blender-relief \
+  --bbox rectangle_iran.geojson \
+  --api-key $OPENTOPO_API_KEY \
+  --demtype SRTMGL3 \
+  --template template.blend \
+  --output hormuz_relief.png \
+  --color-relief examples/ramp_hormuz.txt \
+  --color-relief-mode both \
+  --crs "+proj=aea +lat_1=27 +lat_2=37 +lat_0=32 +lon_0=54 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+```
+
+**Color ramp `examples/ramp_hormuz.txt`** (excerpt):
+
+```text
+nv    0   0   0   0   # nodata → transparent
+0    14  60 120       # sea level — deep blue
+10   80 155 180       # coastal transition
+100 215 195 150       # low desert plains
+600 180 155 108       # mid plateau
+1500 148 118  78      # mountain flanks
+3000 225 215 200      # high peaks
+```
+
+| Shaded relief | Color overlay |
+|:---:|:---:|
+| ![Hormuz shaded relief](docs/images/hormuz_relief.png) | ![Hormuz color overlay](docs/images/hormuz_relief_color.png) |
 
 ---
 

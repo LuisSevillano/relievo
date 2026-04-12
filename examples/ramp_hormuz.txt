@@ -1,0 +1,26 @@
+# Hypsometric tint with bathymetric-style blues
+# Designed for arid/desert terrain with coastal areas (Persian Gulf / Gulf of Oman)
+# Elevation in metres (WGS84)
+#
+# Below sea level / NoData → transparent
+nv  0 0 0 0
+# Sea level (0 m) — deep ocean blue
+0     14  60 120
+# Shallow coastal water / near-shore (SRTM marks these as 0-1 m)
+1     30  90 155
+# Coastal lowlands — warm sandy transition
+10    80 155 180
+50   170 195 175
+# Low desert plains
+100  215 195 150
+300  200 178 128
+# Mid-altitude plateau
+600  180 155 108
+900  160 132  90
+# Mountain flanks
+1500 148 118  78
+2000 165 140 105
+# High peaks
+2500 195 175 150
+3000 225 215 200
+3500 245 240 235
