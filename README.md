@@ -157,8 +157,8 @@ Options:
   --output FILE                Output PNG file path.  [default: output.png]
   --buffer FLOAT               Buffer added to bbox before downloading (e.g. 0.05 = 5%).
   --dem FILE                   Local DEM GeoTIFF - skips the download step entirely.
-  --save-dem FILE              Save the processed UInt16 DEM for later reuse with --dem.
-  --save-processed-dem FILE    Save a copy of the DEM in real metres (before UInt16 conversion).
+  --save-dem FILE              Save the raw downloaded DEM GeoTIFF for reuse with --dem.
+  --save-processed-dem FILE    Save cropped/reprojected DEM in real metres (before UInt16 conversion).
   --crs TEXT                   Reproject DEM to this CRS before rendering (e.g. EPSG:32628).
   --demtype TEXT               OpenTopography dataset key.  [default: SRTMGL1]
   --api-key TEXT               OpenTopography API key (or OPENTOPO_API_KEY env var).
@@ -496,8 +496,8 @@ relievo \
   --exaggeration 1.5
 ```
 
-> **`--save-dem`** saves the UInt16-rescaled DEM that Blender reads directly.
-> **`--save-processed-dem`** saves a copy in real metres (float32 GeoTIFF) - handy for computing statistics, opening in QGIS or reusing in other tools. This file is never used by Blender directly.
+> **`--save-dem`** saves the raw DEM downloaded from OpenTopography (before crop/reproject/UInt16 conversion), so you can rerun with `--dem` without another API call.
+> **`--save-processed-dem`** saves the cropped/reprojected DEM in real metres (before UInt16 conversion) - handy for GIS inspection and statistics. Blender never reads this file directly.
 
 ---
 
