@@ -10,9 +10,9 @@ Think of it as the Blender shaded-relief workflow you already know, but without 
 
 > **Inspired by** Daniel Huffman's Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
 
-| Shaded relief | + hypsometric tint |
-|---|---|
-| ![Tenerife shaded relief](docs/images/tenerife_relief.png) | ![Tenerife with colour tint](docs/images/tenerife_relief_color.png) |
+| Shaded relief | Color layer | Combined |
+|:---:|:---:|:---:|
+| ![Hormuz shaded relief](docs/images/hormuz_shaded.png) | ![Hormuz color layer](docs/images/hormuz_relief_color.png) | ![Hormuz combined](docs/images/hormuz_relief.png) |
 
 And this is the Blender setup it automates behind the scenes, so you can keep the power and skip the interface gymnastics:
 
