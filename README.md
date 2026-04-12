@@ -8,7 +8,7 @@
 
 Think of it as the Blender shaded-relief workflow you already know, but without opening Blender, wiring nodes by hand, or clicking through half a dozen panels before your first render. Same idea, same cartographic spirit, just with a friendlier CLI and fewer opportunities to get lost in the interface.
 
-> **Inspired by** [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
+> **Inspired by** Daniel Huffman's Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
 
 | Shaded relief | + hypsometric tint |
 |---|---|
@@ -75,7 +75,7 @@ GeoJSON bbox
  output.png
 ```
 
-The Blender step follows the [Daniel Huffman shaded relief method](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/): the DEM drives a displacement map on a flat plane lit by a sun lamp; an orthographic camera renders the scene from above.
+The Blender step follows the Daniel Huffman shaded relief method: the DEM drives a displacement map on a flat plane lit by a sun lamp; an orthographic camera renders the scene from above.
 
 ---
 
@@ -678,7 +678,7 @@ For `--clip-mask`, a non-rectangular polygon that follows a coastline or boundar
 
 ## Creating your own Blender template
 
-The `.blend` file must follow the [Daniel Huffman shaded relief setup](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/). The script looks for:
+The `.blend` file must follow the Daniel Huffman shaded relief setup. The script looks for:
 
 | Element | Requirement |
 |---|---|
