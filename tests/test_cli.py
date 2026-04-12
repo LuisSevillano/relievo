@@ -85,13 +85,14 @@ def local_dem_file(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_missing_bbox(runner, tmp_path, template_file):
+    """--bbox is required when --dem is NOT provided (download path)."""
     result = runner.invoke(main, [
         "--template", str(template_file),
         "--output", str(tmp_path / "out.png"),
-        "--dem", str(template_file),
+        # no --dem and no --bbox → should fail with a usage error about bbox
     ])
     assert result.exit_code == 2
-    assert "bbox" in result.output.lower() or "Missing" in result.output
+    assert "bbox" in result.output.lower()
 
 
 def test_missing_template(runner, tmp_path, bbox_file):

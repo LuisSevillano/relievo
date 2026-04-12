@@ -207,8 +207,8 @@ def test_clip_mask_overwrite_in_place(tmp_path, synthetic_png):
     with open(geo_path, "w") as f:
         json.dump(geojson, f)
 
-    # Copy PNG so we don't modify the fixture
-    local_png = str(tmp_path / "render.png")
+    # Copy PNG to a different path so we can overwrite it in-place
+    local_png = str(tmp_path / "render_copy.png")
     shutil.copy(synthetic_png, local_png)
 
     apply_clip_mask(local_png, dem_path, geo_path, local_png)  # overwrite in-place
@@ -228,7 +228,8 @@ def _fake_gdaldem(cmd, capture_output=False, **kwargs):
 
     if cmd[0] == "gdaldem":
         # color-relief → write a 3-band RGB TIFF same size as input DEM
-        in_ds = gdal.Open(cmd[3])  # input is cmd[3]
+        # cmd layout: ["gdaldem", "color-relief", dem_path, ramp_path, out_path]
+        in_ds = gdal.Open(cmd[2])  # dem_path is cmd[2], NOT cmd[3] (which is the ramp)
         out_w = in_ds.RasterXSize if in_ds else 10
         out_h = in_ds.RasterYSize if in_ds else 10
         if in_ds:
@@ -277,13 +278,17 @@ def test_color_relief_output_size_matches_render(mock_run, tmp_path, synthetic_p
 
 @patch("blender_relief.mask.subprocess.run", side_effect=_fake_gdaldem)
 def test_color_relief_mode_separate(mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file):
-    """mode='separate' guarda el PNG de color puro (sin combinar con el render)."""
+    """mode='separate' saves the raw colour PNG to <stem>_color.png; render is untouched."""
+    import os
     output = str(tmp_path / "colored.png")
+    color_output = str(tmp_path / "colored_color.png")
     apply_color_relief(synthetic_png, synthetic_dem, synthetic_dem, color_ramp_file, output,
                        src_min=0.0, src_max=3000.0, mode="separate")
-    import os
-    assert os.path.isfile(output)
-    img = Image.open(output)
+    # render PNG must NOT be created/overwritten
+    assert not os.path.isfile(output), "separate mode must not write to the render output path"
+    # colour layer must exist at <stem>_color.png
+    assert os.path.isfile(color_output)
+    img = Image.open(color_output)
     assert img.mode == "RGB"
 
 
