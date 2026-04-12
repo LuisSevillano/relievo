@@ -72,6 +72,7 @@ def process_dem(
     target_crs: str | None,
     output_path: str,
     workdir: str,
+    save_processed_dem: str | None = None,
 ) -> ProcessResult:
     """Reproject (optional), crop (optional), and rescale a DEM for Blender rendering.
 
@@ -79,8 +80,9 @@ def process_dem(
         input_dem: Path to input DEM GeoTIFF (any CRS).
         bbox_wgs84: (west, south, east, north) in WGS84 degrees, or None to use the full DEM.
         target_crs: Target CRS string (e.g. 'EPSG:3857'), or None to skip reprojection.
-        output_path: Absolute path for the output dem_blender.tif.
+        output_path: Absolute path for the output dem_blender.tif (UInt16).
         workdir: Temporary directory for intermediate files.
+        save_processed_dem: If given, copy the cropped/reprojected DEM (real metres) here.
     """
     _require_gdal()
     if target_crs:
@@ -98,14 +100,8 @@ def process_dem(
         reprojected_path = input_dem
         log.info("Processing DEM  (no reprojection)")
 
-    log.debug("Computing elevation statistics...")
-    ds = gdal.Open(reprojected_path)
-    band = ds.GetRasterBand(1)
-    band.ComputeStatistics(False)
-    src_min = band.GetMinimum()
-    src_max = band.GetMaximum()
-    ds = None
-
+    # Crop first (if bbox given) so that src_min/src_max reflect only the
+    # area of interest — not the entire raster extent.
     if bbox_wgs84 is not None:
         west_wgs, south_wgs, east_wgs, north_wgs = bbox_wgs84
         if target_crs:
@@ -115,10 +111,37 @@ def process_dem(
         else:
             west_m, south_m, east_m, north_m = west_wgs, south_wgs, east_wgs, north_wgs
         proj_win = [west_m, north_m, east_m, south_m]
-        log.debug("Cropping and rescaling to 16-bit...")
+
+        cropped_path = str(Path(workdir) / "a3_cropped.tif")
+        log.debug("Cropping to bbox...")
+        ds_crop = gdal.Translate(
+            cropped_path, reprojected_path,
+            options=gdal.TranslateOptions(projWin=proj_win, format="GTiff"),
+        )
+        if ds_crop is None:
+            raise RuntimeError("gdal.Translate (crop) failed")
+        ds_crop = None
+        stats_path = cropped_path
     else:
         proj_win = None
-        log.debug("Rescaling to 16-bit (full DEM, no crop)...")
+        stats_path = reprojected_path
+
+    log.debug("Computing elevation statistics on cropped area...")
+    ds = gdal.Open(stats_path)
+    band = ds.GetRasterBand(1)
+    band.ComputeStatistics(False)
+    src_min = band.GetMinimum()
+    src_max = band.GetMaximum()
+    ds = None
+
+    # Optionally save the processed (cropped + reprojected, real metres) DEM
+    if save_processed_dem:
+        import shutil as _shutil
+        _shutil.copy2(stats_path, save_processed_dem)
+        log.info(f"Processed DEM saved  →  {save_processed_dem}")
+
+    log.debug(f"Elevation range: {src_min:.1f} – {src_max:.1f} m")
+    log.debug("Rescaling to 16-bit...")
 
     # Map real data to [1, 65535], reserving UInt16=0 as the nodata sentinel.
     # This avoids collisions between nodata pixels and actual minimum-elevation
@@ -126,11 +149,10 @@ def process_dem(
     # when the source nodata value (e.g. -32768 in SRTM15Plus) is out of the
     # UInt16 range.
     ds = gdal.Translate(
-        output_path, reprojected_path,
+        output_path, stats_path,
         options=gdal.TranslateOptions(
             outputType=gdal.GDT_UInt16,
             scaleParams=[[src_min, src_max, 1, 65535]],
-            projWin=proj_win,
             format="GTiff",
             noData=0,
         ),
@@ -148,7 +170,7 @@ def process_dem(
     log.debug(f"DEM processed: {width_m:.1f} x {height_m:.1f} CRS units  ({raster_x}×{raster_y} px)")
     return ProcessResult(
         dem_path=output_path,
-        source_dem_path=reprojected_path,  # real elevation values in metres
+        source_dem_path=stats_path,  # real elevation values in metres
         width_m=width_m,
         height_m=height_m,
         raster_x=raster_x,

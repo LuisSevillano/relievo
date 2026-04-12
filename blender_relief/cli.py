@@ -104,7 +104,14 @@ def _find_blender(blender_bin: str) -> str:
 )
 @click.option(
     "--save-dem", type=click.Path(), default=None,
-    help="Save the downloaded DEM to this path. Useful to reuse it later with --dem and skip re-downloading.",
+    help="Save the raw downloaded DEM to this path (before reprojection/crop). "
+         "Reuse later with --dem to skip re-downloading.",
+)
+@click.option(
+    "--save-processed-dem", type=click.Path(), default=None,
+    help="Save the processed DEM (after reprojection and crop, in real metres) to this path. "
+         "Useful for inspecting the exact raster that Blender renders, or for reuse with --dem "
+         "when you always apply the same --crs and --bbox.",
 )
 @click.option(
     "--crs", default=None,
@@ -194,7 +201,7 @@ def _find_blender(blender_bin: str) -> str:
     help="Do not delete the temporary working directory after render.",
 )
 def main(
-    bbox, template, output, buffer, dem, save_dem, crs, demtype, api_key,
+    bbox, template, output, buffer, dem, save_dem, save_processed_dem, crs, demtype, api_key,
     exaggeration, samples, max_size, scale,
     light_azimuth, light_altitude, color_ramp, color_relief_mode, clip_mask,
     dry_run, no_render,
@@ -297,12 +304,16 @@ def main(
 
         # Process DEM: reproject, crop (si hay bbox), rescale
         dem_blender_path = os.path.join(workdir, "dem_blender.tif")
+        save_processed_abs = (
+            str(pathlib.Path(save_processed_dem).resolve()) if save_processed_dem else None
+        )
         result = process_dem(
             input_dem=input_dem,
             bbox_wgs84=bbox_wgs84,
             target_crs=crs,
             output_path=dem_blender_path,
             workdir=workdir,
+            save_processed_dem=save_processed_abs,
         )
 
         if no_render:
