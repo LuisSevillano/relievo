@@ -10,7 +10,7 @@ import time
 
 import click
 
-from . import log
+from . import __version__, log
 from .download import DEM_DATASETS, buffer_bbox, download_dem, estimate_pixels, extract_wgs84_bbox
 from .process import process_dem
 from .render import render
@@ -64,7 +64,8 @@ def _find_blender(blender_bin: str) -> str:
     )
 
 
-@click.command()
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(__version__, "-V", "--version", prog_name="blender-relief")
 @click.option(
     "--config", type=click.Path(exists=True), is_eager=True, expose_value=False,
     callback=_load_config,
@@ -153,17 +154,17 @@ def _find_blender(blender_bin: str) -> str:
 )
 @click.option(
     "--color-relief", "color_ramp", type=click.Path(exists=True), default=None,
-    help="Ruta a un fichero de ramp de gdaldem. Aplica un tint hipsométrico sobre el render. Requiere gdaldem en PATH.",
+    help="Path to a gdaldem colour ramp file. Applies a hypsometric tint over the render. Requires gdaldem on PATH.",
 )
 @click.option(
     "--color-relief-mode", "color_relief_mode",
     type=click.Choice(["overlay", "separate", "both"], case_sensitive=False),
     default="overlay", show_default=True,
     help=(
-        "Modo de salida del color relief. "
-        "'overlay' combina el tint sobre el render (por defecto). "
-        "'separate' guarda sólo el PNG de color (sin combinar). "
-        "'both' guarda los dos: el combinado en --output y el color puro en <output>_color.png."
+        "How to output the colour relief layer. "
+        "'overlay' multiplies the tint onto the render (default). "
+        "'separate' saves only the colour PNG without blending. "
+        "'both' saves the composite to --output and the raw colour layer to <output>_color.png."
     ),
 )
 @click.option(
@@ -205,10 +206,26 @@ def main(
     download DEM → process with GDAL → render in Blender.
 
     \b
-    Examples:
-      blender-relief --bbox region.geojson --template relief.blend --output out.png
-      blender-relief --dem local.tif --bbox region.geojson --template relief.blend --output out.png
-      blender-relief --config myprofile.toml --bbox region.geojson --template relief.blend --output out.png
+    Input sources (one required):
+      --dem local.tif              Use a local DEM file
+      --api-key + --bbox           Download from OpenTopography
+
+    \b
+    Quick examples:
+      # Download and render
+      blender-relief --api-key $KEY --bbox region.geojson \\
+                     --template relief.blend --output out.png
+
+      # Use local DEM, crop to bbox
+      blender-relief --dem local.tif --bbox region.geojson \\
+                     --template relief.blend --output out.png
+
+      # Reproject + hypsometric tint
+      blender-relief --dem local.tif --crs EPSG:25831 \\
+                     --color-relief ramp.txt --template relief.blend --output out.png
+
+      # Config file
+      blender-relief --config myprofile.toml --output out.png
     """
     log.setup(verbose)
 
