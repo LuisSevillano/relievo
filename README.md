@@ -1,7 +1,5 @@
 # relievo
 
-**Automated shaded relief maps with Blender. From a bounding box to a publication-ready PNG in one command.**
-
 ![relievo banner](docs/images/banner_prineos.png)
 
 `relievo` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode separate` to get the composite *and* the raw colour layer - all scriptable, all reproducible.
