@@ -25,6 +25,7 @@
 - [Colour ramp format](#colour-ramp-format)
 - [Available DEM datasets](#available-dem-datasets)
 - [OpenTopography API key](#opentopography-api-key)
+- [Cartographic best practices](#cartographic-best-practices)
 - [Tips and caveats](#tips-and-caveats)
 
 ---
@@ -672,6 +673,20 @@ blender-relief --list-datasets
 > Use `COP30` for areas outside SRTM coverage (Scandinavia, Alaska, high Arctic…).  
 > Use `SRTM15Plus` for ocean bathymetry — it's the only dataset with negative elevations below sea level.
 
+### Choosing the right resolution
+
+Higher resolution is not always better — it means larger downloads, longer processing times and often no visible improvement at the scale you're mapping. Use the minimum resolution that matches your output scale:
+
+| Map area / scale | Recommended resolution | Suggested dataset |
+|---|---|---|
+| World map, continent | 500 m – 1 km | `SRTM15Plus`, `COP90` |
+| Country, large region (e.g. Iberian Peninsula) | ~90 m | `SRTMGL3`, `COP90` |
+| Region, autonomous community | ~30 m | `SRTMGL1`, `COP30`, `NASADEM` |
+| Province, metropolitan area | 10–30 m | `COP30`, `AW3D30` |
+| Local detail, single city | < 5 m | Your own data (LiDAR, IGN, USGS 1 m…) |
+
+> **Example:** Rendering the entire Iberian Peninsula with `SRTMGL1` (30 m) downloads ~500 MB and produces ~50 000 × 40 000 pixels — yet the visible difference vs. `SRTMGL3` (90 m) at a printed A2 map is zero. Use 90 m and save the bandwidth.
+
 ---
 
 ## OpenTopography API key
@@ -691,6 +706,86 @@ api_key = "your_key_here"
 # Per-command
 blender-relief --api-key your_key_here ...
 ```
+
+### Responsible API use
+
+OpenTopography is a free academic service. Please be a considerate user:
+
+**Download once, render many times.** Save the DEM on the first run and reuse it for all subsequent iterations — different sun angles, exaggeration values or colour ramps won't need a new download.
+
+```bash
+# Step 1 — download and save; skip rendering
+blender-relief \
+  --bbox my_region.geojson \
+  --template template.blend \
+  --no-render \
+  --save-dem my_region.tif
+
+# Step 2 — render from local file, no API call
+blender-relief \
+  --bbox my_region.geojson \
+  --template template.blend \
+  --dem my_region.tif \
+  --output relief.png
+```
+
+**Choose the minimum useful resolution.** See the [resolution guide above](#choosing-the-right-resolution) — downloading 30 m data for a continent-scale map wastes bandwidth and produces no visible benefit.
+
+**Respect the [OpenTopography terms of use](https://opentopography.org/usagepolicies).** The API is free but rate-limited. Avoid scripting bulk or repeated downloads of the same area.
+
+---
+
+## Cartographic best practices
+
+> This section draws heavily from Daniel Huffman's essay [**"Towards Less Blender-y Relief"**](https://somethingaboutmaps.wordpress.com/2022/01/13/towards-less-blender-y-relief/) (2022). If you make shaded relief maps, read it.
+
+Blender produces beautiful, photorealistic shading — sometimes *too* beautiful. The "Blender look" is now instantly recognisable: deep shadows, high contrast, every micro-terrain feature rendered in sharp detail. That aesthetic works for some contexts, but it can overwhelm the rest of the map and make terrain harder to read, not easier.
+
+### Avoid over-dramatisation
+
+**Tone down the vertical exaggeration.** It is tempting to push `--exaggeration` up to make terrain look dramatic, but high exaggeration makes all relief look volcanic. As a starting point:
+
+| Terrain type | Suggested `--exaggeration` |
+|---|---|
+| High mountains (Alps, Tenerife, Andes) | 0.5 – 1.0 |
+| Medium relief (Pyrenees, Appalachians) | 1.0 – 1.5 |
+| Low hills, coastal plains | 2.0 – 3.5 |
+| Flat terrain (deltas, steppes) | 3.5 – 6.0 |
+
+Adjust from there based on your visual judgment — these are departure points, not rules.
+
+**Keep the light angle subtle.** The cartographic convention of NW light (azimuth ~315°, altitude 35–45°) exists for a reason: it reads neutrally. South-facing or very low-angle light creates drama but can make north-facing slopes unreadably dark.
+
+### Smooth the DEM before rendering
+
+Blender faithfully renders every noise artifact, sensor stripe and interpolation glitch in the source data. For regional or national-scale maps, pre-smoothing the DEM eliminates visual clutter and makes large landform structures read more clearly — exactly as traditional hand-drawn relief simplifies and generalises terrain.
+
+A simple approach with GDAL:
+
+```bash
+# Resample to a coarser grid and back — effective low-pass filter
+gdalwarp -tr 0.003 0.003 -r average input.tif smoothed_coarse.tif
+gdalwarp -tr 0.001 0.001 -r bilinear smoothed_coarse.tif smoothed.tif
+
+# Then render from the smoothed version
+blender-relief --dem smoothed.tif --bbox region.geojson ...
+```
+
+Or blend the smoothed and original DEMs for a "soft detail" effect (Huffman recommends ~80–90% smoothed + 10–20% original):
+
+```bash
+# Blend with gdal_calc (requires gdal-bin / conda gdal)
+gdal_calc.py -A smoothed.tif -B input.tif \
+  --outfile=blended.tif \
+  --calc="0.85*A + 0.15*B" \
+  --NoDataValue=0
+```
+
+### Relief as background, not foreground
+
+Shaded relief should support the map — labels, roads, boundaries — not compete with it. If your relief is the only element, push the contrast. If it's a basemap layer, pull it back: use `--exaggeration` on the lower end, consider a gentle hypsometric tint (`--color-relief`) to add elevation context without adding shadow drama, and keep the sun angle conventional.
+
+> *"Terrain relief doesn't always need to be dramatic."* — Daniel Huffman
 
 ---
 
