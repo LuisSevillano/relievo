@@ -172,7 +172,7 @@ Options:
   --clip-mask                  Clip output to the GeoJSON polygon shape (RGBA).
   --dry-run                    Print estimated download/render info and exit.
   --no-render                  Download and process DEM only; skip Blender.
-  --blender PATH           Path to the Blender executable.
+  --blender PATH               Path to the Blender executable.
   --verbose                    Detailed progress log.
   --keep-workdir               Keep the temporary working directory after render.
   --help                       Show this message and exit.
@@ -212,6 +212,19 @@ relievo \
 ```
 
 ![Overlay](docs/images/tenerife_relief_color.png)
+
+Alternative style using a QGIS-inspired elevation ramp:
+
+```bash
+relievo \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
+  --dem dem.tif \
+  --output relieve_qgis.png \
+  --color-relief examples/ramp_elevation_qgis.txt
+```
+
+![QGIS-inspired elevation ramp](docs/images/tenerife_relief_qgis.png)
 
 ---
 
@@ -688,6 +701,8 @@ nv               0     0    0   # nodata
 ```
 
 A ready-to-use ramp is included at **`examples/ramp_terrain.txt`**.
+
+An additional QGIS-inspired option is available at **`examples/ramp_elevation_qgis.txt`** (based on the QGIS Hub "Elevation Ramp" style family).
 
 ---
 

@@ -1,0 +1,22 @@
+# QGIS-inspired elevation ramp for gdaldem color-relief
+# Inspired by QGIS Hub "Elevation Ramp" (cpt-city: ncl/topo_15lev)
+# Format: elevation_m  R  G  B
+
+-6000   20   56  120   # abyssal
+-4000   34   82  154   # deep ocean
+-2500   52  112  178   # ocean
+-1200   78  144  196   # upper ocean
+-300   124  182  214   # shelf
+0       186  220  226   # sea level
+1       222  210  170   # coast / beach
+200     170  186  108   # lowland
+500     124  170   92   # plains
+1000     92  146   88   # hills
+1500    138  156   86   # lower mountains
+2000    168  146   92   # mountains
+2600    176  132  108   # high mountains
+3200    188  168  148   # alpine
+3800    214  204  196   # near snow line
+4500    236  234  232   # snow
+5200    252  252  252   # permanent snow
+nv        0    0    0   # nodata
