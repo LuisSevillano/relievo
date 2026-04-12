@@ -22,6 +22,9 @@ sample_bbox.geojson
 # macOS
 .DS_Store
 
+# Personal scripts (not for distribution)
+execute.sh
+
 # Misc
 *.tif
 *.tif.aux.xml
