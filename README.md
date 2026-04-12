@@ -35,6 +35,7 @@ And this is the Blender setup it automates behind the scenes, so you can keep th
 - [OpenTopography API key](#opentopography-api-key)
 - [Cartographic best practices](#cartographic-best-practices)
 - [Tips and caveats](#tips-and-caveats)
+- [Notes on authorship and tooling](#notes-on-authorship-and-tooling)
 
 ---
 
@@ -877,6 +878,24 @@ relievo --bbox region.geojson --template relief.blend \
 ```
 
 **Debugging** - `--verbose` shows the full GDAL pipeline and Blender log. `--keep-workdir` preserves the temporary directory for inspecting intermediate files.
+
+---
+
+## Notes on authorship and tooling
+
+Although most of my experience is closer to the frontend — design, visualisation and graphics — I also work on the backend, where I primarily use R for data analysis and task automation. I have some experience with Python, particularly in geospatial workflows and satellite imagery analysis, but not at a level where I could comfortably build a CLI of this complexity on my own.
+
+The idea behind `relievo` had been on my mind for a while. In my day-to-day work, deadlines are often tight, and when producing static maps in Illustrator I don’t always have the time to give shaded relief the attention and care it deserves. This CLI is a direct response to that constraint: automating a powerful but time-consuming workflow and making it reproducible.
+
+The development of this project has been made possible by the current landscape of AI-assisted tooling, which allows ideas to be implemented even in languages or domains where one is not deeply experienced. In this case, I used tools such as Codex (GPT-5.3) and Claude (Sonnet 4.6) to accelerate development.
+
+It is important to clarify that:
+
+- The core idea, workflow design and key decisions are my own.
+- A significant portion of the code has been reviewed, adapted and iterated on manually.
+- At the same time, parts of the codebase were heavily assisted by these models.
+
+I’m very happy with the result and confident that I’ll be using this tool extensively in my own work. I also hope others find it useful in their workflows.
 
 ---
 
