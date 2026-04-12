@@ -834,3 +834,41 @@ relievo --bbox region.geojson --template relief.blend \
 ```
 
 **Debugging** - `--verbose` shows the full GDAL pipeline and Blender log. `--keep-workdir` preserves the temporary directory for inspecting intermediate files.
+
+---
+
+## Development workflow
+
+Install development tooling:
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
+```
+
+Run quality checks manually:
+
+```bash
+ruff check relievo/ tests/
+pytest tests/ -q
+```
+
+Build and validate package artifacts:
+
+```bash
+make package
+```
+
+The repository keeps only curated binary assets under `docs/images/` plus `template.blend`. Generated renders and temporary rasters should remain local.
+
+---
+
+## Versioning policy
+
+`relievo` follows semantic versioning from the `0.0.1` baseline:
+
+- `0.0.x` for patch fixes and documentation corrections.
+- `0.x.0` for backward-compatible feature additions before stable `1.0.0`.
+- `1.x.y` after CLI behavior and interfaces are considered stable.
+
+Every release must have a matching changelog entry in `CHANGELOG.md`.

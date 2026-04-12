@@ -5,11 +5,14 @@ __pycache__/
 dist/
 build/
 .eggs/
+.venv/
 
 # Renders and test outputs
 *.png
+!docs/images/*.png
 *.blend1
 log.txt
+out*.png
 
 # Blender project files (user-specific templates)
 tenerife_template.blend

@@ -7,8 +7,25 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  lint:
+    name: Lint (Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint dependencies
+        run: pip install ruff
+
+      - name: Run lint
+        run: ruff check relievo/ tests/
+
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -40,8 +57,8 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v --tb=short
 
-  lint-only:
-    name: Lint (no GDAL)
+  packaging:
+    name: Packaging (Python 3.12)
     runs-on: ubuntu-latest
 
     steps:
@@ -51,8 +68,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
 
-      - name: Lint
-        run: ruff check relievo/ tests/
+      - name: Validate wheel install
+        run: |
+          python -m venv .venv-packaging
+          . .venv-packaging/bin/activate
+          pip install --upgrade pip
+          pip install dist/*.whl
+          relievo --version

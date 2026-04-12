@@ -23,7 +23,7 @@ relievo = "relievo.cli:main"
 where = ["."]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff>=0.4"]
+dev = ["pytest>=7", "ruff>=0.4", "pre-commit>=3.7", "build>=1.2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

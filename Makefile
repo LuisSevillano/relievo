@@ -1,7 +1,7 @@
-PYTHON := /Library/Frameworks/Python.framework/Versions/3.9/bin/python3.9
-PIP    := /Library/Frameworks/Python.framework/Versions/3.9/bin/pip3.9
+PYTHON ?= python3
+PIP    ?= pip3
 
-.PHONY: help install test test-fast lint format check clean
+.PHONY: help install test test-fast lint format check package clean
 
 help:
 	@echo "Usage: make <target>"
@@ -12,6 +12,7 @@ help:
 	@echo "  lint        Run ruff linter"
 	@echo "  format      Auto-format with ruff"
 	@echo "  check       lint + test (CI equivalent)"
+	@echo "  package     Build sdist/wheel and verify CLI from wheel"
 	@echo "  clean       Remove build artifacts and __pycache__"
 
 install:
@@ -24,13 +25,18 @@ test-fast:
 	$(PYTHON) -m pytest tests/ -v -m "not slow"
 
 lint:
-	$(PYTHON) -m ruff check blender_relief/ tests/
+	$(PYTHON) -m ruff check relievo/ tests/
 
 format:
-	$(PYTHON) -m ruff format blender_relief/ tests/
+	$(PYTHON) -m ruff format relievo/ tests/
 
 check: lint test
 
+package:
+	$(PYTHON) -m pip install --upgrade build
+	$(PYTHON) -m build
+	$(PYTHON) -m venv .venv-packaging
+	. .venv-packaging/bin/activate && pip install --upgrade pip && pip install dist/*.whl && relievo --version
+
 clean:
-	rm -rf build/ dist/ *.egg-info .pytest_cache
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	rm -rf build/ dist/ *.egg-info .pytest_cache .venv-packaging
