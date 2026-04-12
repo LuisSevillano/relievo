@@ -690,8 +690,6 @@ The `.blend` file must follow the Daniel Huffman shaded relief setup. The script
 
 The included **`template.blend`** is a ready-to-use starting point. Open it in Blender, adjust materials, atmosphere, displacement strength, render settings - then save and use it as your `--template`.
 
-By default, that template includes **two Sun lights** with different strengths and `angle` values. This gives a balanced base look out of the box, while still letting you override direction from the CLI with `--light-azimuth` and `--light-altitude`.
-
 **`relievo` only overrides:**
 - Which DEM texture is loaded
 - Plane dimensions and camera ortho scale (derived from DEM pixel size)
