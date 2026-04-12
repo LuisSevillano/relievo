@@ -22,5 +22,15 @@ blender-relief = "blender_relief.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
