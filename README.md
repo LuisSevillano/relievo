@@ -155,7 +155,7 @@ Options:
   --list-demtypes              List all available DEM datasets and exit.
   --bbox FILE                  GeoJSON bounding box polygon in WGS84.  [required]
   --template FILE              Path to the .blend template file.  [required]
-  --output FILE                Output PNG file path.  [default: output.png]
+  --output FILE                Output image path (.png, .jpg, .jpeg).  [default: output.png]
   --buffer FLOAT               Buffer added to bbox before downloading (e.g. 0.05 = 5%).
   --dem FILE                   Local DEM GeoTIFF - skips the download step entirely.
   --save-dem FILE              Save the raw downloaded DEM GeoTIFF for reuse with --dem.
@@ -883,19 +883,15 @@ relievo --bbox region.geojson --template relief.blend \
 
 ## Notes on authorship and tooling
 
-Although most of my experience is closer to the frontend — design, visualisation and graphics — I also work on the backend, where I primarily use R for data analysis and task automation. I have some experience with Python, particularly in geospatial workflows and satellite imagery analysis, but not at a level where I could comfortably build a CLI of this complexity on my own.
+Most of my background is in frontend work, especially design, visualisation, and graphics. I also work on backend tasks, where I mainly use R for data analysis and automation. I had prior Python experience in geospatial workflows and satellite imagery analysis, but not enough to comfortably build a CLI of this complexity on my own.
 
-The idea behind `relievo` had been on my mind for a while. In my day-to-day work, deadlines are often tight, and when producing static maps in Illustrator I don’t always have the time to give shaded relief the attention and care it deserves. This CLI is a direct response to that constraint: automating a powerful but time-consuming workflow and making it reproducible.
+This project was developed with strong support from AI-assisted tooling. I used Codex (GPT-5.3) and Claude (Sonnet 4.6) to accelerate implementation and iteration.
 
-The development of this project has been made possible by the current landscape of AI-assisted tooling, which allows ideas to be implemented even in languages or domains where one is not deeply experienced. In this case, I used tools such as Codex (GPT-5.3) and Claude (Sonnet 4.6) to accelerate development.
+To be clear:
 
-It is important to clarify that:
-
-- The core idea, workflow design and key decisions are my own.
-- A significant portion of the code has been reviewed, adapted and iterated on manually.
-- At the same time, parts of the codebase were heavily assisted by these models.
-
-I’m very happy with the result and confident that I’ll be using this tool extensively in my own work. I also hope others find it useful in their workflows.
+- The product direction, workflow design, and key decisions are mine.
+- A significant part of the code was reviewed, adapted, and iterated manually.
+- Parts of the codebase were heavily assisted by these models.
 
 ---
 

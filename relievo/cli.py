@@ -13,6 +13,8 @@ from .download import DEM_DATASETS, buffer_bbox, download_dem, estimate_pixels, 
 from .process import process_dem
 from .render import render
 
+_SUPPORTED_OUTPUT_SUFFIXES = {".png", ".jpg", ".jpeg"}
+
 
 def _print_demtypes(ctx, param, value):
     if not value or ctx.resilient_parsing:
@@ -62,6 +64,13 @@ def _find_blender(blender_bin: str) -> str:
     )
 
 
+def _validate_output_path(output_path: str) -> None:
+    suffix = pathlib.Path(output_path).suffix.lower()
+    if suffix not in _SUPPORTED_OUTPUT_SUFFIXES:
+        allowed = ", ".join(sorted(_SUPPORTED_OUTPUT_SUFFIXES))
+        raise click.UsageError(f"Unsupported output format '{suffix}'. Use one of: {allowed}.")
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, "-V", "--version", prog_name="relievo")
 @click.option(
@@ -102,7 +111,7 @@ def _find_blender(blender_bin: str) -> str:
     "--output",
     required=True,
     type=click.Path(),
-    help="Output PNG file path.",
+    help="Output image path (.png, .jpg, .jpeg).",
 )
 @click.option(
     "--buffer",
@@ -294,7 +303,7 @@ def main(
     blender_bin,
     keep_workdir,
 ):
-    """Create a shaded relief PNG from a DEM using Blender.
+    """Create a shaded relief image from a DEM using Blender.
 
     Automates the Daniel Huffman shaded relief workflow:
     download DEM → process with GDAL → render in Blender.
@@ -326,6 +335,7 @@ def main(
     # Resolve absolute paths early
     output_abs = str(pathlib.Path(output).resolve())
     bbox_abs = str(pathlib.Path(bbox).resolve()) if bbox else None
+    _validate_output_path(output_abs)
 
     # Validate bbox before anything else (including Blender lookup)
     if dem is None and not bbox:

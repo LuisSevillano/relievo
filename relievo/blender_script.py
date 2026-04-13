@@ -15,6 +15,7 @@ Template assumptions (must be set up once manually in Blender GUI):
 """
 
 import argparse
+import pathlib
 import sys
 
 import bpy
@@ -23,7 +24,7 @@ import bpy
 def parse_args() -> argparse.Namespace:
     # Blender's sys.argv: ['blender', ..., '--', '--dem-path', ...]
     argv = sys.argv
-    argv = argv[argv.index("--") + 1:] if "--" in argv else []
+    argv = argv[argv.index("--") + 1 :] if "--" in argv else []
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--dem-path", required=True)
@@ -44,8 +45,7 @@ def parse_args() -> argparse.Namespace:
 def get_plane_material(obj_name: str = "Plane") -> "bpy.types.Material":
     if obj_name not in bpy.data.objects:
         raise RuntimeError(
-            f"Object '{obj_name}' not found. "
-            f"Available: {list(bpy.data.objects.keys())}"
+            f"Object '{obj_name}' not found. Available: {list(bpy.data.objects.keys())}"
         )
     obj = bpy.data.objects[obj_name]
     if not obj.material_slots:
@@ -117,7 +117,7 @@ def main() -> None:
     ry = max(1, round(args.raster_y * factor))
     scene.render.resolution_x = rx
     scene.render.resolution_y = ry
-    print(f"Render resolution: {rx}×{ry} px  (DEM aspect {args.raster_x/args.raster_y:.3f})")
+    print(f"Render resolution: {rx}×{ry} px  (DEM aspect {args.raster_x / args.raster_y:.3f})")
 
     scene.render.resolution_percentage = args.scale
 
@@ -125,7 +125,7 @@ def main() -> None:
         # Plano con las proporciones exactas del DEM → sin bandas, sin distorsión.
         set_plane_exact("Plane", plane_x, plane_y)
 
-        scene.camera.data.sensor_fit = 'VERTICAL'
+        scene.camera.data.sensor_fit = "VERTICAL"
         scene.camera.data.ortho_scale = plane_y
         print(f"Camera: ortho_scale={plane_y:.4f}  plane={plane_x:.3f}×{plane_y:.3f}")
 
@@ -140,6 +140,7 @@ def main() -> None:
 
     if args.light_azimuth is not None or args.light_altitude is not None:
         import math
+
         sun = next(
             (o for o in bpy.data.objects if o.type == "LIGHT" and o.data.type == "SUN"),
             None,
@@ -152,11 +153,18 @@ def main() -> None:
             sun.rotation_euler = (math.radians(90.0 - alt), 0.0, math.radians(az))
             print(f"Sun light: azimuth={az:.1f}° altitude={alt:.1f}°")
         else:
-            print("Warning: no SUN lamp found in template - --light-azimuth/--light-altitude ignored.")
+            print(
+                "Warning: no SUN lamp found in template - --light-azimuth/--light-altitude ignored."
+            )
 
     scene.render.filepath = args.output
-    scene.render.image_settings.file_format = "PNG"
-    scene.render.image_settings.color_depth = "16"
+    suffix = pathlib.Path(args.output).suffix.lower()
+    if suffix in (".jpg", ".jpeg"):
+        scene.render.image_settings.file_format = "JPEG"
+        scene.render.image_settings.color_depth = "8"
+    else:
+        scene.render.image_settings.file_format = "PNG"
+        scene.render.image_settings.color_depth = "16"
 
     bpy.ops.render.render(write_still=True)
 

@@ -13,6 +13,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 try:
     from osgeo import gdal
+
     _GDAL_AVAILABLE = True
 except ImportError:
     gdal = None  # type: ignore[assignment]
@@ -23,6 +24,7 @@ from . import log
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _collect_exterior_ring(data: dict) -> list:
     """Return the exterior ring of the first Polygon found in a GeoJSON dict.
@@ -69,9 +71,25 @@ def _open_as_rgb8(path: str) -> Image.Image:
     return img
 
 
+def _save_image(img: Image.Image, output_path: str) -> None:
+    """Save image honoring output extension (.png/.jpg/.jpeg)."""
+    suffix = pathlib.Path(output_path).suffix.lower()
+    if suffix in (".jpg", ".jpeg"):
+        if img.mode in ("RGBA", "LA"):
+            white = Image.new("RGB", img.size, (255, 255, 255))
+            alpha = img.getchannel("A") if "A" in img.getbands() else None
+            white.paste(img.convert("RGB"), mask=alpha)
+            white.save(output_path, format="JPEG", quality=95)
+        else:
+            img.convert("RGB").save(output_path, format="JPEG", quality=95)
+    else:
+        img.save(output_path, format="PNG")
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def apply_clip_mask(
     render_png: str,
@@ -106,7 +124,7 @@ def apply_clip_mask(
     ds = gdal.Open(dem_path)
     if ds is None:
         raise RuntimeError(f"Cannot open DEM: {dem_path}")
-    gt = ds.GetGeoTransform()   # (x0, dx, 0, y0, 0, dy)
+    gt = ds.GetGeoTransform()  # (x0, dx, 0, y0, 0, dy)
     dem_w = ds.RasterXSize
     dem_h = ds.RasterYSize
     dem_crs_wkt = ds.GetProjection()
@@ -115,6 +133,7 @@ def apply_clip_mask(
     # --- Reproject ring if DEM is in a projected CRS ---
     if dem_crs_wkt:
         from pyproj import CRS, Transformer
+
         try:
             dem_crs = CRS.from_wkt(dem_crs_wkt)
             wgs84 = CRS.from_epsg(4326)
@@ -131,10 +150,7 @@ def apply_clip_mask(
 
     # --- Convert geographic coords → DEM pixel coords ---
     # col = (x - x0) / dx,   row = (y - y0) / dy
-    dem_pixels = [
-        ((x - gt[0]) / gt[1], (y - gt[3]) / gt[5])
-        for x, y in ring
-    ]
+    dem_pixels = [((x - gt[0]) / gt[1], (y - gt[3]) / gt[5]) for x, y in ring]
 
     # --- Scale DEM pixels → render pixels ---
     img = Image.open(render_png)
@@ -151,7 +167,7 @@ def apply_clip_mask(
     img_rgba = img.convert("RGBA")
     r, g, b, a = img_rgba.split()
     new_alpha = ImageChops.multiply(a, mask)
-    Image.merge("RGBA", (r, g, b, new_alpha)).save(output_path, format="PNG")
+    _save_image(Image.merge("RGBA", (r, g, b, new_alpha)), output_path)
     log.info(f"Clip mask applied  →  {output_path}")
 
 
@@ -245,7 +261,7 @@ def apply_color_relief(
 
     with tempfile.TemporaryDirectory(prefix="relievo-cr-") as tmpdir:
         rescaled_ramp = str(pathlib.Path(tmpdir) / "ramp_uint16.txt")
-        color_tif     = str(pathlib.Path(tmpdir) / "color_relief.tif")
+        color_tif = str(pathlib.Path(tmpdir) / "color_relief.tif")
         color_png_tmp = str(pathlib.Path(tmpdir) / "color_relief.png")
 
         # 1. Reescribir el ramp de metros a valores UInt16 del dem_blender.tif
@@ -263,7 +279,8 @@ def apply_color_relief(
         # 3. GeoTIFF → PNG (Pillow no lee bien los canales alpha de GDAL GeoTIFF)
         subprocess.run(
             ["gdal_translate", "-of", "PNG", color_tif, color_png_tmp],
-            capture_output=True, check=True,
+            capture_output=True,
+            check=True,
         )
 
         # 4. Resize directo al tamaño del render (sin crop ni padding)
@@ -276,15 +293,15 @@ def apply_color_relief(
         separate_path = str(out_path.with_name(out_path.stem + "_color" + out_path.suffix))
 
         if mode == "separate":
-            color_final.save(separate_path, format="PNG")
+            _save_image(color_final, separate_path)
             log.info(f"Color relief guardado  →  {separate_path}")
         elif mode == "both":
-            color_final.save(separate_path, format="PNG")
+            _save_image(color_final, separate_path)
             log.info(f"Color relief guardado  →  {separate_path}")
             blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
-            blended.save(output_path, format="PNG")
+            _save_image(blended, output_path)
             log.info(f"Color relief aplicado  →  {output_path}")
         else:  # overlay
             blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
-            blended.save(output_path, format="PNG")
+            _save_image(blended, output_path)
             log.info(f"Color relief aplicado  →  {output_path}")

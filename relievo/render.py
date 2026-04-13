@@ -28,7 +28,7 @@ def render(
     light_azimuth: float = None,
     light_altitude: float = None,
 ) -> None:
-    """Run Blender in background mode to render the shaded relief PNG.
+    """Run Blender in background mode to render the shaded relief image.
 
     The blender_script.py bundled with this package is passed to Blender
     via --python and receives parameters after the '--' separator.
@@ -40,21 +40,31 @@ def render(
 
     cmd = [
         blender_bin,
-        "--background", str(pathlib.Path(blend_template).resolve()),
-        "--python", str(script_path),
+        "--background",
+        str(pathlib.Path(blend_template).resolve()),
+        "--python",
+        str(script_path),
         "--",
-        "--dem-path", str(pathlib.Path(dem_path).resolve()),
-        "--width-m", str(width_m),
-        "--height-m", str(height_m),
-        "--raster-x", str(raster_x),
-        "--raster-y", str(raster_y),
-        "--max-size", str(max_size or 0),
-        "--scale", str(scale),
+        "--dem-path",
+        str(pathlib.Path(dem_path).resolve()),
+        "--width-m",
+        str(width_m),
+        "--height-m",
+        str(height_m),
+        "--raster-x",
+        str(raster_x),
+        "--raster-y",
+        str(raster_y),
+        "--max-size",
+        str(max_size or 0),
+        "--scale",
+        str(scale),
         *_opt("--exaggeration", exaggeration),
         *_opt("--samples", samples),
         *_opt("--light-azimuth", light_azimuth),
         *_opt("--light-altitude", light_altitude),
-        "--output", str(pathlib.Path(output_path).resolve()),
+        "--output",
+        str(pathlib.Path(output_path).resolve()),
     ]
 
     log.info("Rendering...")
@@ -71,6 +81,5 @@ def render(
             sys.stderr.buffer.write(result.stdout or b"")
             sys.stderr.buffer.write(result.stderr or b"")
         raise RuntimeError(
-            f"Blender exited with code {result.returncode}. "
-            "Check the output above for details."
+            f"Blender exited with code {result.returncode}. Check the output above for details."
         )
