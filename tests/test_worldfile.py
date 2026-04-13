@@ -117,7 +117,7 @@ def test_worldfile_warns_with_no_render(tmp_path):
 
 
 def test_worldfile_writes_standard_extension_and_prj(tmp_path, monkeypatch):
-    class _FakeDS:
+    class _FakeRefDS:
         RasterXSize = 4
         RasterYSize = 2
 
@@ -127,10 +127,21 @@ def test_worldfile_writes_standard_extension_and_prj(tmp_path, monkeypatch):
         def GetProjection(self):
             return 'GEOGCS["WGS 84"]'
 
+    class _FakeImgDS:
+        def SetGeoTransform(self, _):
+            return None
+
+        def SetProjection(self, _):
+            return None
+
     class _FakeGDAL:
+        GA_Update = 1
+
         @staticmethod
-        def Open(_):
-            return _FakeDS()
+        def Open(path, mode=0):
+            if path == "dummy.tif":
+                return _FakeRefDS()
+            return _FakeImgDS()
 
     monkeypatch.setattr(worldfile, "gdal", _FakeGDAL)
 

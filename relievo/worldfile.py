@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+from xml.sax.saxutils import escape
 
 from PIL import Image
 
@@ -31,6 +32,18 @@ def default_prj_path(image_path: str) -> str:
 def _legacy_worldfile_path(image_path: str) -> str:
     p = pathlib.Path(image_path)
     return str(p.with_suffix(p.suffix + ".wld"))
+
+
+def _aux_xml_path(image_path: str) -> str:
+    return image_path + ".aux.xml"
+
+
+def _write_aux_xml(image_path: str, projection_wkt: str, geotransform: tuple[float, ...]) -> None:
+    gt = ", ".join(f"{v:.15f}" for v in geotransform)
+    srs_xml = f"  <SRS>{escape(projection_wkt)}</SRS>\n" if projection_wkt else ""
+    content = f"<PAMDataset>\n{srs_xml}  <GeoTransform>{gt}</GeoTransform>\n</PAMDataset>\n"
+    with open(_aux_xml_path(image_path), "w", encoding="utf-8") as fp:
+        fp.write(content)
 
 
 def write_worldfile(
@@ -88,6 +101,10 @@ def write_worldfile(
     if projection_wkt:
         with open(default_prj_path(image_path), "w", encoding="utf-8") as fp:
             fp.write(projection_wkt)
+
+    # Persist SRS/geotransform to PAM sidecar (.aux.xml) for raster formats
+    # that do not embed CRS internally (e.g., JPEG/PNG).
+    _write_aux_xml(image_path, projection_wkt, (gt[0], a, b, gt[3], d, e))
 
     if worldfile_path is None:
         legacy = _legacy_worldfile_path(image_path)
