@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "relievo"
-version = "0.0.1"
+version = "0.0.3"
 description = "CLI to automate shaded relief map creation in Blender (Huffman method)"
 requires-python = ">=3.9"
 dependencies = [

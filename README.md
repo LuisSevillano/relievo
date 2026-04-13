@@ -173,6 +173,7 @@ Options:
   --color-relief FILE          gdaldem colour ramp file for hypsometric tint.
   --color-relief-mode TEXT     overlay | separate | both.  [default: overlay]
   --clip-mask                  Clip output to the GeoJSON polygon shape (RGBA).
+  --worldfile                  Write georeferencing sidecars next to the output image (PGW/JGW/WLD + PRJ).
   --dry-run                    Print estimated download/render info and exit.
   --no-render                  Download and process DEM only; skip Blender.
   --blender PATH               Path to the Blender executable.
@@ -371,6 +372,21 @@ relievo \
 ```
 
 The clip shape is taken from `--bbox`. For precise cuts, supply a polygon that follows the actual coastline or boundary rather than a rectangular bbox.
+
+If you want to place the output directly in GIS software, add `--worldfile`:
+
+```bash
+relievo \
+  --bbox examples/bboxes/tenerife_bbox.geojson \
+  --template template.blend \
+  --dem dem.tif \
+  --output tenerife.jpg \
+  --worldfile
+# → tenerife.jgw
+# → tenerife.prj
+```
+
+Worldfile sidecars are written with standard extensions: `.pgw` for PNG, `.jgw` for JPEG, plus a `.prj` file with CRS information.
 
 ![Tenerife masked to island polygon](docs/images/tenerife_island_masked.png)
 

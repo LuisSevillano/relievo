@@ -245,6 +245,12 @@ def _validate_output_path(output_path: str) -> None:
     "Pixels outside the polygon become transparent (RGBA output).",
 )
 @click.option(
+    "--worldfile",
+    is_flag=True,
+    default=False,
+    help="Write a georeferencing sidecar next to the output image (PGW/JGW/WLD + PRJ).",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -297,6 +303,7 @@ def main(
     color_ramp,
     color_relief_mode,
     clip_mask,
+    worldfile,
     dry_run,
     no_render,
     verbose,
@@ -359,6 +366,7 @@ def main(
             color_ramp,
             color_relief_mode,
             clip_mask,
+            worldfile,
             no_render,
         )
         return
@@ -385,6 +393,9 @@ def main(
 
     if no_render and clip_mask:
         log.info("Note: --clip-mask has no effect when --no-render is set (nothing to clip).")
+
+    if no_render and worldfile:
+        log.info("Note: --worldfile has no effect when --no-render is set (no output image).")
 
     t_start = time.monotonic()
     workdir = tempfile.mkdtemp(prefix="relievo-")
@@ -487,6 +498,12 @@ def main(
                 log.info("Applying clip mask...")
                 apply_clip_mask(output_abs, result.dem_path, bbox_abs, output_abs)
 
+        if worldfile:
+            from .worldfile import write_worldfile
+
+            worldfile_out = write_worldfile(output_abs, result.dem_path)
+            log.info(f"World file saved  →  {worldfile_out}")
+
         elapsed = time.monotonic() - t_start
         m, s = divmod(int(elapsed), 60)
         duration = f"{m}m {s}s" if m else f"{s}s"
@@ -513,6 +530,7 @@ def _print_dry_run(
     color_ramp,
     color_relief_mode,
     clip_mask,
+    worldfile,
     no_render,
 ):
     """Print a summary of what would happen, then exit."""
@@ -554,6 +572,8 @@ def _print_dry_run(
         click.echo(f"  Color relief:      {color_ramp}  (mode: {color_relief_mode})")
     if clip_mask:
         click.echo("  Clip mask:         enabled")
+    if worldfile:
+        click.echo("  World file:        enabled")
     if no_render:
         click.echo("  Render:            skipped (--no-render)")
 
