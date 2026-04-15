@@ -350,6 +350,30 @@ def test_color_relief_mode_both(mock_run, tmp_path, synthetic_png, synthetic_dem
     assert os.path.isfile(color_only)
 
 
+@patch("relievo.mask.subprocess.run", side_effect=_fake_gdaldem)
+def test_color_relief_blend_linearburn(
+    mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file
+):
+    """blend_mode='linearburn' should generate a valid combined output."""
+    import os
+
+    output = str(tmp_path / "colored_linearburn.png")
+    apply_color_relief(
+        synthetic_png,
+        synthetic_dem,
+        synthetic_dem,
+        color_ramp_file,
+        output,
+        src_min=0.0,
+        src_max=3000.0,
+        mode="overlay",
+        blend_mode="linearburn",
+    )
+    assert os.path.isfile(output)
+    img = Image.open(output)
+    assert img.mode == "RGB"
+
+
 @patch("relievo.mask.subprocess.run")
 def test_color_relief_gdaldem_failure_raises(
     mock_run, tmp_path, synthetic_png, synthetic_dem, color_ramp_file

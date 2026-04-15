@@ -239,9 +239,21 @@ def _validate_output_path(output_path: str) -> None:
     show_default=True,
     help=(
         "How to output the colour relief layer. "
-        "'overlay' multiplies the tint onto the render (default). "
+        "'overlay' applies tint over the render using --color-relief-blend. "
         "'separate' saves only the colour PNG without blending. "
         "'both' saves the composite to --output and the raw colour layer to <output>_color.png."
+    ),
+)
+@click.option(
+    "--color-relief-blend",
+    "color_relief_blend",
+    type=click.Choice(["multiply", "linearburn"], case_sensitive=False),
+    default="multiply",
+    show_default=True,
+    help=(
+        "Blend algorithm for combining relief + tint. "
+        "'multiply' is the classic method; 'linearburn' uses Linear Burn shadows + Screen highlights "
+        "to keep flat colours brighter."
     ),
 )
 @click.option(
@@ -309,6 +321,7 @@ def main(
     light_altitude,
     color_ramp,
     color_relief_mode,
+    color_relief_blend,
     clip_mask,
     worldfile,
     dry_run,
@@ -372,6 +385,7 @@ def main(
             light_altitude,
             color_ramp,
             color_relief_mode,
+            color_relief_blend,
             clip_mask,
             worldfile,
             no_render,
@@ -512,6 +526,7 @@ def main(
                 src_min=result.src_min,
                 src_max=result.src_max,
                 mode=color_relief_mode,
+                blend_mode=color_relief_blend,
             )
 
         if clip_mask:
@@ -554,6 +569,7 @@ def _print_dry_run(
     light_altitude,
     color_ramp,
     color_relief_mode,
+    color_relief_blend,
     clip_mask,
     worldfile,
     no_render,
@@ -600,7 +616,9 @@ def _print_dry_run(
         click.echo(f"  Sun:               azimuth={light_azimuth}°  altitude={light_altitude}°")
 
     if color_ramp:
-        click.echo(f"  Color relief:      {color_ramp}  (mode: {color_relief_mode})")
+        click.echo(
+            f"  Color relief:      {color_ramp}  (mode: {color_relief_mode}, blend: {color_relief_blend})"
+        )
     if clip_mask:
         click.echo("  Clip mask:         enabled")
     if worldfile:

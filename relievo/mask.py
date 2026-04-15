@@ -86,6 +86,61 @@ def _save_image(img: Image.Image, output_path: str) -> None:
         img.save(output_path, format="PNG")
 
 
+def _shadow_layer_from_relief(
+    relief_gray: Image.Image, cutoff: int, strength: float
+) -> Image.Image:
+    """Build a shadow layer for Linear Burn from a grayscale relief.
+
+    - Pixels brighter than ``cutoff`` become white (no effect in Linear Burn).
+    - Darker pixels are stretched into 0..255.
+    - ``strength`` fades the effect toward white.
+    """
+    cutoff = max(1, min(254, int(cutoff)))
+    strength = max(0.0, min(1.0, float(strength)))
+
+    stretched = relief_gray.point(lambda x: 255 if x >= cutoff else int((x / cutoff) * 255))
+    if strength >= 0.999:
+        return stretched
+    return stretched.point(lambda x: int(255 - strength * (255 - x)))
+
+
+def _highlight_layer_from_relief(
+    relief_gray: Image.Image, cutoff: int, strength: float
+) -> Image.Image:
+    """Build a highlight layer for Screen from a grayscale relief.
+
+    - Pixels darker than ``cutoff`` become black (no effect in Screen).
+    - Brighter pixels are stretched into 0..255.
+    - ``strength`` fades the effect toward black.
+    """
+    cutoff = max(1, min(254, int(cutoff)))
+    strength = max(0.0, min(1.0, float(strength)))
+
+    scale = 255 - cutoff
+    stretched = relief_gray.point(lambda x: 0 if x <= cutoff else int(((x - cutoff) / scale) * 255))
+    if strength >= 0.999:
+        return stretched
+    return stretched.point(lambda x: int(strength * x))
+
+
+def _blend_linearburn(color_img: Image.Image, relief_img: Image.Image) -> Image.Image:
+    """Blend color + shaded relief using Linear Burn + Screen method.
+
+    1) Extract dark shadows and apply with Linear Burn.
+    2) Extract bright highlights and apply with Screen.
+    """
+    relief_gray = relief_img.convert("L")
+    shadow_layer = _shadow_layer_from_relief(relief_gray, cutoff=175, strength=0.75).convert("RGB")
+    highlight_layer = _highlight_layer_from_relief(relief_gray, cutoff=140, strength=0.35).convert(
+        "RGB"
+    )
+
+    # Linear Burn: result = max(0, base + blend - 255)
+    linear_burn = ImageChops.add(color_img, shadow_layer, scale=1.0, offset=-255)
+    # Screen for highlights
+    return ImageChops.screen(linear_burn, highlight_layer)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -217,6 +272,7 @@ def apply_color_relief(
     src_min: float = 0.0,
     src_max: float = 65535.0,
     mode: str = "overlay",
+    blend_mode: str = "multiply",
 ) -> None:
     """Genera un tint hipsométrico a partir de dem_blender.tif y lo combina con el render.
 
@@ -246,6 +302,8 @@ def apply_color_relief(
               ``"separate"`` - guarda sólo el color sin combinar en output_path;
               ``"both"`` - guarda el combinado en output_path y el color puro
               en ``<output_path_sin_ext>_color.<ext>``.
+        blend_mode: ``"multiply"`` (actual, compatible) o ``"linearburn"``
+              (sombras con Linear Burn + luces con Screen).
     """
     if not _GDAL_AVAILABLE:
         raise ImportError("GDAL is required for --color-relief. Install via conda-forge.")
@@ -298,10 +356,16 @@ def apply_color_relief(
         elif mode == "both":
             _save_image(color_final, separate_path)
             log.info(f"Color relief guardado  →  {separate_path}")
-            blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
+            if blend_mode == "linearburn":
+                blended = _blend_linearburn(color_final, _open_as_rgb8(render_png))
+            else:
+                blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
             _save_image(blended, output_path)
             log.info(f"Color relief aplicado  →  {output_path}")
         else:  # overlay
-            blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
+            if blend_mode == "linearburn":
+                blended = _blend_linearburn(color_final, _open_as_rgb8(render_png))
+            else:
+                blended = ImageChops.multiply(_open_as_rgb8(render_png), color_final)
             _save_image(blended, output_path)
             log.info(f"Color relief aplicado  →  {output_path}")
