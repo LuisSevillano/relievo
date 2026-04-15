@@ -93,13 +93,19 @@ The Blender step follows the Daniel Huffman shaded relief method: the DEM drives
 
 ### Prerequisites
 
-| Dependency | Required for | How to install |
+Core requirements (always needed):
+
+| Dependency | Required for | Notes |
 |---|---|---|
-| Python ≥ 3.9 | core | conda / pyenv |
-| GDAL ≥ 3.6 | DEM processing | **conda-forge only** |
+| Python ≥ 3.9 | CLI runtime | `conda` or `pyenv` |
 | Blender ≥ 3.6 | rendering | [blender.org](https://www.blender.org/download/) |
-| `gdaldem` | `--color-relief` | included with GDAL |
-| OpenTopography API key | automatic DEM download | [opentopography.org](https://opentopography.org/developers) - free |
+| GDAL ≥ 3.6 | DEM processing + `--color-relief` | includes `gdaldem` |
+
+Optional (only for automatic download):
+
+| Dependency | Required for | Notes |
+|---|---|---|
+| OpenTopography API key | DEM download when `--dem` is not used | [opentopography.org](https://opentopography.org/developers) (free) |
 
 > GDAL must be installed through **conda-forge**. `pip install gdal` is not reliable.
 
