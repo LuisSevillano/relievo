@@ -10,9 +10,18 @@ Think of it as the Blender shaded-relief workflow you already know, but without 
 
 > **Inspired by** Daniel Huffman's Blender method, [Nick Underwood's blenderize.sh](https://github.com/nunderwood6/blender_prep) and Kyaw Naing Win's [OpenTopography DEM Downloader](https://github.com/knwin/OpenTopography-DEM-Downloader-qgis-plugin) QGIS plugin - which pioneered bringing the OpenTopography API directly into a geospatial workflow.
 
-| Shaded relief | Color layer | Combined |
-|:---:|:---:|:---:|
-| ![Hormuz shaded relief](docs/images/hormuz_shaded.jpg) | ![Hormuz color layer](docs/images/hormuz_relief_color.jpg) | ![Hormuz combined](docs/images/hormuz_relief.jpg) |
+<table>
+  <tr>
+    <th>Shaded relief</th>
+    <th>Color layer</th>
+    <th>Combined</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/hormuz_shaded.jpg" alt="Hormuz shaded relief" width="100%" /></td>
+    <td><img src="docs/images/hormuz_relief_color.jpg" alt="Hormuz color layer" width="100%" /></td>
+    <td><img src="docs/images/hormuz_relief.jpg" alt="Hormuz combined" width="100%" /></td>
+  </tr>
+</table>
 
 And this is the Blender setup it automates behind the scenes, so you can keep the power and skip the interface gymnastics:
 
@@ -579,9 +588,18 @@ nv    0   0   0   0   # nodata → transparent
 3000 225 215 200      # high peaks
 ```
 
-| Shaded relief | Color layer | Combined |
-|:---:|:---:|:---:|
-| ![Hormuz shaded relief](docs/images/hormuz_shaded.jpg) | ![Hormuz color layer](docs/images/hormuz_relief_color.jpg) | ![Hormuz combined](docs/images/hormuz_relief.jpg) |
+<table>
+  <tr>
+    <th>Shaded relief</th>
+    <th>Color layer</th>
+    <th>Combined</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/hormuz_shaded.jpg" alt="Hormuz shaded relief" width="100%" /></td>
+    <td><img src="docs/images/hormuz_relief_color.jpg" alt="Hormuz color layer" width="100%" /></td>
+    <td><img src="docs/images/hormuz_relief.jpg" alt="Hormuz combined" width="100%" /></td>
+  </tr>
+</table>
 
 ---
 
