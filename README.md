@@ -181,6 +181,7 @@ Options:
   --smooth FLOAT               DEM smoothing factor (>1). Blurs terrain before rendering.
   --color-relief FILE          gdaldem colour ramp file for hypsometric tint.
   --color-relief-mode TEXT     overlay | separate | both.  [default: overlay]
+  --color-relief-blend TEXT    multiply | linearburn.  [default: multiply]
   --clip-mask                  Clip output to the GeoJSON polygon shape (RGBA).
   --worldfile                  Write georeferencing sidecars next to the output image (PGW/JGW/WLD + PRJ).
   --dry-run                    Print estimated download/render info and exit.
@@ -323,7 +324,7 @@ relievo \
 
 ### 3. Hypsometric colour tint
 
-Composite a colour-by-elevation layer over the render using multiply blending. Requires `gdaldem` (ships with any GDAL install).
+Composite a colour-by-elevation layer over the render. Requires `gdaldem` (ships with any GDAL install).
 
 ```bash
 relievo \
@@ -334,6 +335,37 @@ relievo \
 ```
 
 The included `examples/ramp_terrain.txt` covers −500 m (deep water) to 5 000 m (permanent snow). Edit elevation breakpoints and colours freely.
+
+For brighter, less muddy composites (especially when preparing editable layers for PSD/AI), try the **Linear Burn + Screen** blend method shown by Daniel Huffman in his Photoshop tutorial (which he credits to techniques learned from **Tom Patterson** and **Tanya Buckingham**):
+
+```bash
+relievo \
+  --bbox examples/bboxes/rectangle_iran.geojson \
+  --dem examples/hormuz.tif \
+  --template template.blend \
+  --output hormuz_linearburn.jpg \
+  --color-relief examples/ramp_hormuz.txt \
+  --color-relief-mode both \
+  --color-relief-blend linearburn
+```
+
+Quick visual comparison using the same Amazon test scene (`--bbox examples/bboxes/south_america.geojson --dem south_america.tif`):
+
+<table>
+  <tr>
+    <th>Multiply (default)</th>
+    <th>Linear Burn + Screen</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/amazonas_multiply.jpg" alt="Amazon blend multiply" width="100%" /></td>
+    <td><img src="docs/images/amazonas_linearburn.jpg" alt="Amazon blend linearburn" width="100%" /></td>
+  </tr>
+</table>
+
+Both runs can also export the raw colour layer (`--color-relief-mode both`) so you can finish compositing in PSD/AI:
+
+- `docs/images/amazonas_multiply_color.jpg`
+- `docs/images/amazonas_linearburn_color.jpg`
 
 ---
 
