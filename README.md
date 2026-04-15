@@ -349,6 +349,24 @@ relievo \
   --color-relief-blend linearburn
 ```
 
+Quick visual comparison using the same Amazon test scene (`--bbox examples/bboxes/south_america.geojson --dem south_america.tif`):
+
+<table>
+  <tr>
+    <th>Multiply (default)</th>
+    <th>Linear Burn + Screen</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/amazonas_multiply.jpg" alt="Amazon blend multiply" width="100%" /></td>
+    <td><img src="docs/images/amazonas_linearburn.jpg" alt="Amazon blend linearburn" width="100%" /></td>
+  </tr>
+</table>
+
+Both runs can also export the raw colour layer (`--color-relief-mode both`) so you can finish compositing in PSD/AI:
+
+- `docs/images/amazonas_multiply_color.jpg`
+- `docs/images/amazonas_linearburn_color.jpg`
+
 ---
 
 ### 4. Separate colour layer for compositing
