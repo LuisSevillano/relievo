@@ -1,6 +1,6 @@
 # relievo
 
-![relievo banner](docs/images/banner_prineos.png)
+![relievo banner](docs/images/banner_prineos.jpg)
 
 `relievo` is a CLI that drives [Daniel Huffman's](https://somethingaboutmaps.wordpress.com/2017/11/16/creating-shaded-relief-in-blender/) shaded relief workflow without touching Blender's GUI. Give it a geographic bounding box and a `.blend` template and it downloads the elevation data, prepares the DEM, runs Blender headlessly and delivers a render. Add `--color-relief` for a hypsometric colour tint, `--clip-mask` to cut the result to your exact polygon and `--color-relief-mode separate` to get the composite *and* the raw colour layer - all scriptable, all reproducible.
 
@@ -12,11 +12,11 @@ Think of it as the Blender shaded-relief workflow you already know, but without 
 
 | Shaded relief | Color layer | Combined |
 |:---:|:---:|:---:|
-| ![Hormuz shaded relief](docs/images/hormuz_shaded.png) | ![Hormuz color layer](docs/images/hormuz_relief_color.png) | ![Hormuz combined](docs/images/hormuz_relief.png) |
+| ![Hormuz shaded relief](docs/images/hormuz_shaded.jpg) | ![Hormuz color layer](docs/images/hormuz_relief_color.jpg) | ![Hormuz combined](docs/images/hormuz_relief.jpg) |
 
 And this is the Blender setup it automates behind the scenes, so you can keep the power and skip the interface gymnastics:
 
-![Blender setup screenshot](docs/images/blender_screenshot.png)
+![Blender setup screenshot](docs/images/blender_screenshot.jpg)
 
 ---
 
@@ -200,7 +200,7 @@ relievo \
   --output relieve.png
 ```
 
-![Shaded relief](docs/images/tenerife_relief.png)
+![Shaded relief](docs/images/tenerife_relief.jpg)
 
 ---
 
@@ -215,7 +215,7 @@ relievo \
   --color-relief examples/ramp_terrain.txt
 ```
 
-![Overlay](docs/images/tenerife_relief_color.png)
+![Overlay](docs/images/tenerife_relief_color.jpg)
 
 Alternative style using a QGIS-inspired elevation ramp:
 
@@ -228,7 +228,7 @@ relievo \
   --color-relief examples/ramp_elevation_qgis.txt
 ```
 
-![QGIS-inspired elevation ramp](docs/images/tenerife_relief_qgis.png)
+![QGIS-inspired elevation ramp](docs/images/tenerife_relief_qgis.jpg)
 
 Alternative style with a subtler atlas look:
 
@@ -241,7 +241,7 @@ relievo \
   --color-relief examples/ramp_subtle_atlas.txt
 ```
 
-![Subtle atlas tint](docs/images/tenerife_relief_subtle.png)
+![Subtle atlas tint](docs/images/tenerife_relief_subtle.jpg)
 
 ---
 
@@ -257,7 +257,7 @@ relievo ... --light-azimuth 180 --light-altitude 18
 
 | NW (315°, 35°) | South (180°, 18°) |
 |---|---|
-| ![NW light](docs/images/ex_light_nw.png) | ![South light](docs/images/ex_light_south.png) |
+| ![NW light](docs/images/ex_light_nw.jpg) | ![South light](docs/images/ex_light_south.jpg) |
 
 ---
 
@@ -277,7 +277,7 @@ relievo \
 
 | Composite | Raw colour layer |
 |---|---|
-| ![Composite](docs/images/ex_overlay.png) | ![Colour layer](docs/images/ex_overlay_color.png) |
+| ![Composite](docs/images/ex_overlay.jpg) | ![Colour layer](docs/images/ex_overlay_color.jpg) |
 
 ---
 
@@ -388,7 +388,7 @@ relievo \
 
 Worldfile sidecars are written with standard extensions: `.pgw` for PNG, `.jgw` for JPEG, plus a `.prj` file with CRS information.
 
-![Tenerife masked to island polygon](docs/images/tenerife_island_masked.png)
+![Tenerife masked to island polygon](docs/images/tenerife_island_masked.jpg)
 
 ---
 
@@ -453,7 +453,7 @@ relievo \
 
 | No smoothing | `--smooth 8` |
 |:---:|:---:|
-| ![Tenerife no smoothing](docs/images/tenerife_no_smooth.png) | ![Tenerife smooth 8](docs/images/tenerife_smooth_8.png) |
+| ![Tenerife no smoothing](docs/images/tenerife_no_smooth.jpg) | ![Tenerife smooth 8](docs/images/tenerife_smooth_8.jpg) |
 
 > **Values to try:** 2–4 for subtle softening; 6–10 for regional maps where fine detail is not needed. Values above 10 tend to flatten ridges too aggressively.
 
@@ -581,7 +581,7 @@ nv    0   0   0   0   # nodata → transparent
 
 | Shaded relief | Color layer | Combined |
 |:---:|:---:|:---:|
-| ![Hormuz shaded relief](docs/images/hormuz_shaded.png) | ![Hormuz color layer](docs/images/hormuz_relief_color.png) | ![Hormuz combined](docs/images/hormuz_relief.png) |
+| ![Hormuz shaded relief](docs/images/hormuz_shaded.jpg) | ![Hormuz color layer](docs/images/hormuz_relief_color.jpg) | ![Hormuz combined](docs/images/hormuz_relief.jpg) |
 
 ---
 
@@ -652,7 +652,7 @@ relievo \
   --bbox examples/bboxes/rectangle_iran.geojson \
   --demtype SRTM15Plus \
   --template template.blend \
-  --output docs/images/hormuz_shaded_no_buffer.png \
+  --output docs/images/hormuz_shaded_no_buffer.jpg \
   --crs "+proj=aea +lat_1=27 +lat_2=37 +lat_0=32 +lon_0=54 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs" \
   --buffer 0
 
@@ -661,14 +661,14 @@ relievo \
   --bbox examples/bboxes/rectangle_iran.geojson \
   --demtype SRTM15Plus \
   --template template.blend \
-  --output docs/images/hormuz_shaded_with_buffer.png \
+  --output docs/images/hormuz_shaded_with_buffer.jpg \
   --crs "+proj=aea +lat_1=27 +lat_2=37 +lat_0=32 +lon_0=54 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs" \
   --buffer 1
 ```
 
 | `--buffer 0` | `--buffer 1` |
 |:---:|:---:|
-| ![Hormuz without buffer](docs/images/hormuz_shaded_no_buffer.png) | ![Hormuz with larger buffer](docs/images/hormuz_shaded_with_buffer.png) |
+| ![Hormuz without buffer](docs/images/hormuz_shaded_no_buffer.jpg) | ![Hormuz with larger buffer](docs/images/hormuz_shaded_with_buffer.jpg) |
 
 ---
 
