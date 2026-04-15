@@ -1,0 +1,9 @@
+template = "template.blend"
+demtype = "COP30"
+crs = "EPSG:32628"
+exaggeration = 1.2
+light_azimuth = 315
+light_altitude = 35
+samples = 256
+color_ramp = "examples/ramp_terrain.txt"
+color_relief_mode = "both"

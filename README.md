@@ -347,7 +347,8 @@ For brighter, less muddy composites (especially when preparing editable layers f
 ```bash
 relievo \
   --bbox examples/bboxes/rectangle_iran.geojson \
-  --dem examples/hormuz.tif \
+  --api-key $OPENTOPO_API_KEY \
+  --demtype SRTM15Plus \
   --template template.blend \
   --output hormuz_linearburn.jpg \
   --color-relief examples/ramp_hormuz.txt \
@@ -355,7 +356,7 @@ relievo \
   --color-relief-blend linearburn
 ```
 
-Quick visual comparison using the same Amazon test scene (`--bbox examples/bboxes/south_america.geojson --dem south_america.tif`):
+Quick visual comparison using the same Amazon test scene (`--bbox examples/bboxes/south_america.geojson`):
 
 <table>
   <tr>
