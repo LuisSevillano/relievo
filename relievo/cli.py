@@ -9,7 +9,14 @@ import time
 import click
 
 from . import __version__, log
-from .download import DEM_DATASETS, buffer_bbox, download_dem, estimate_pixels, extract_wgs84_bbox
+from .download import (
+    DEM_DATASETS,
+    buffer_bbox,
+    download_dem,
+    estimate_bbox_area_km2,
+    estimate_pixels,
+    extract_wgs84_bbox,
+)
 from .process import process_dem
 from .render import render
 
@@ -418,6 +425,24 @@ def main(
             raw_dem_path = os.path.join(workdir, "raw_dem.tif")
             download_bbox = buffer_bbox(bbox_wgs84, buffer) if buffer > 0 else bbox_wgs84
             log.debug(f"Buffer: {buffer * 100:.0f}% applied to download bbox")
+            _, _, max_area_km2 = DEM_DATASETS.get(demtype, (demtype, 0, 0))
+            request_area_km2 = estimate_bbox_area_km2(download_bbox)
+            if max_area_km2 and request_area_km2 > max_area_km2:
+                candidates = [
+                    code
+                    for code, (_, _, area_km2) in DEM_DATASETS.items()
+                    if area_km2 >= request_area_km2
+                ]
+                suggestion = (
+                    f"Try a broader-coverage dataset, e.g. {', '.join(candidates[:4])}."
+                    if candidates
+                    else "Try a broader-coverage dataset (for example SRTM15Plus), or reduce the bbox."
+                )
+                raise click.UsageError(
+                    f"The requested bbox is too large for dataset '{demtype}' "
+                    f"(~{request_area_km2:,.0f} km² requested; limit ~{max_area_km2:,.0f} km²). "
+                    f"Reduce the GeoJSON extent or switch DEM dataset. {suggestion}"
+                )
             download_dem(download_bbox, demtype, api_key, raw_dem_path)
             if save_dem:
                 save_dem_abs = str(pathlib.Path(save_dem).resolve())
@@ -534,7 +559,7 @@ def _print_dry_run(
     no_render,
 ):
     """Print a summary of what would happen, then exit."""
-    from .download import DEM_DATASETS, buffer_bbox, extract_wgs84_bbox
+    from .download import DEM_DATASETS, buffer_bbox, estimate_bbox_area_km2, extract_wgs84_bbox
 
     click.echo("Dry run - nothing will be downloaded or rendered.")
     click.echo()
@@ -553,8 +578,14 @@ def _print_dry_run(
                 f"  BBox (buffered):   W={bw:.4f}  S={bs:.4f}  E={be:.4f}  N={bn:.4f}  (+{buffer * 100:.0f}%)"
             )
         px_x, px_y = estimate_pixels(download_bbox, demtype)
-        name, arcsec, _ = DEM_DATASETS.get(demtype, (demtype, "?", 0))
+        name, arcsec, max_area_km2 = DEM_DATASETS.get(demtype, (demtype, "?", 0))
+        request_area_km2 = estimate_bbox_area_km2(download_bbox)
         click.echo(f'  DEM type:          {demtype}  ({name}, {arcsec}" / ~{arcsec * 30}m)')
+        click.echo(f"  Estimated area:    ~{request_area_km2:,.0f} km²")
+        if max_area_km2:
+            click.echo(f"  Dataset limit:     ~{max_area_km2:,.0f} km²")
+            if request_area_km2 > max_area_km2:
+                click.echo("  Warning:           bbox exceeds selected dataset limit")
         click.echo(f"  Estimated pixels:  {px_x} × {px_y}")
         plane_x = px_x / 1000.0
         plane_y = px_y / 1000.0

@@ -12,19 +12,19 @@ OPENTOPO_ENDPOINT = "https://portal.opentopography.org/API/globaldem"
 # Dataset registry: code → (display name, resolution in arc-seconds, max area km²)
 # Source: OpenTopography DEM Downloader QGIS plugin + OpenTopography docs
 DEM_DATASETS = {
-    "SRTMGL1":         ("SRTM 30m",                        1,    450_000),
-    "SRTMGL1_E":       ("SRTM GL1 Ellipsoidal 30m",        1,    450_000),
-    "SRTMGL3":         ("SRTM 90m",                        3,  4_050_000),
-    "AW3D30":          ("ALOS World 3D 30m",                1,    450_000),
-    "AW3D30_E":        ("ALOS World 3D Ellipsoidal 30m",   1,    450_000),
-    "SRTM15Plus":      ("Global Bathymetry SRTM15+ V2.1", 15, 125_000_000),
-    "COP30":           ("Copernicus DSM 30m",               1,    450_000),
-    "COP90":           ("Copernicus DSM 90m",               3,  4_050_000),
-    "NASADEM":         ("NASADEM 30m",                      1,    450_000),
-    "EU_DTM":          ("EU DTM 30m",                       1,    450_000),
-    "GEDI_L3":         ("GEDI L3 1km",                    30,    450_000),
-    "GEBCOIceTopo":    ("GEBCO IceTopo 500m",              15,  4_050_000),
-    "GEBCOSubIceTopo": ("GEBCO SubIceTopo 500m",           15,  4_050_000),
+    "SRTMGL1": ("SRTM 30m", 1, 450_000),
+    "SRTMGL1_E": ("SRTM GL1 Ellipsoidal 30m", 1, 450_000),
+    "SRTMGL3": ("SRTM 90m", 3, 4_050_000),
+    "AW3D30": ("ALOS World 3D 30m", 1, 450_000),
+    "AW3D30_E": ("ALOS World 3D Ellipsoidal 30m", 1, 450_000),
+    "SRTM15Plus": ("Global Bathymetry SRTM15+ V2.1", 15, 125_000_000),
+    "COP30": ("Copernicus DSM 30m", 1, 450_000),
+    "COP90": ("Copernicus DSM 90m", 3, 4_050_000),
+    "NASADEM": ("NASADEM 30m", 1, 450_000),
+    "EU_DTM": ("EU DTM 30m", 1, 450_000),
+    "GEDI_L3": ("GEDI L3 1km", 30, 450_000),
+    "GEBCOIceTopo": ("GEBCO IceTopo 500m", 15, 4_050_000),
+    "GEBCOSubIceTopo": ("GEBCO SubIceTopo 500m", 15, 4_050_000),
 }
 
 
@@ -42,6 +42,22 @@ def estimate_pixels(bbox_wgs84: tuple, demtype: str) -> tuple:
     pixels_x = math.ceil((east - west) * px_per_degree)
     pixels_y = math.ceil((north - south) * px_per_degree)
     return (pixels_x, pixels_y)
+
+
+def estimate_bbox_area_km2(bbox_wgs84: tuple) -> float:
+    """Estimate bbox area in km² using a geographic approximation.
+
+    Uses 111.32 km/deg latitude and scales longitude by cos(mid_lat).
+    This is sufficient for request-size validation and user guidance.
+    """
+    west, south, east, north = bbox_wgs84
+    dlon = abs(east - west)
+    dlat = abs(north - south)
+    mid_lat = (south + north) / 2.0
+
+    km_per_deg_lat = 111.32
+    km_per_deg_lon = 111.32 * math.cos(math.radians(mid_lat))
+    return (dlat * km_per_deg_lat) * (dlon * km_per_deg_lon)
 
 
 def buffer_bbox(bbox_wgs84: tuple, pct: float) -> tuple:
@@ -98,12 +114,7 @@ def _collect_coords(obj: dict) -> list:
         return [pt for ring in obj.get("coordinates", []) for pt in ring]
 
     if geom_type == "MultiPolygon":
-        return [
-            pt
-            for poly in obj.get("coordinates", [])
-            for ring in poly
-            for pt in ring
-        ]
+        return [pt for poly in obj.get("coordinates", []) for ring in poly for pt in ring]
 
     if geom_type == "GeometryCollection":
         coords = []
@@ -130,7 +141,7 @@ def download_dem(
     if demtype in DEM_DATASETS:
         name, arcsec, _ = DEM_DATASETS[demtype]
         px_x, px_y = estimate_pixels(bbox_wgs84, demtype)
-        log.info(f"Downloading DEM  {demtype} ({arcsec}\" / ~{arcsec*30}m)  est. {px_x}×{px_y} px")
+        log.info(f'Downloading DEM  {demtype} ({arcsec}" / ~{arcsec * 30}m)  est. {px_x}×{px_y} px')
         log.debug(f"Dataset: {name}")
 
     params = {
@@ -144,9 +155,7 @@ def download_dem(
     }
 
     log.debug("Sending request to OpenTopography...")
-    response = requests.get(
-        OPENTOPO_ENDPOINT, params=params, stream=True, timeout=timeout
-    )
+    response = requests.get(OPENTOPO_ENDPOINT, params=params, stream=True, timeout=timeout)
 
     content_type = response.headers.get("Content-Type", "")
     if response.status_code == 401 or "text/html" in content_type and response.status_code != 200:
