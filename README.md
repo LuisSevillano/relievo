@@ -16,7 +16,7 @@ Think of it as the Blender shaded-relief workflow you already know, but without 
 
 And this is the Blender setup it automates behind the scenes, so you can keep the power and skip the interface gymnastics:
 
-![Blender setup screenshot](docs/images/blender_screenshot.jpg)
+![Blender setup screenshot](docs/images/blender_screenshot.png)
 
 ---
 
@@ -641,6 +641,34 @@ Dry run - nothing will be downloaded or rendered.
 
 Output → tenerife.png
 ```
+
+If you do not pass `--buffer`, `relievo` already adds a **5% buffer by default**. In most cases this avoids hard edge cuts near the map frame.
+
+If you still see odd border cuts in shaded relief (for example because of reprojection/crop edge effects), increase the buffer explicitly.
+
+```bash
+# No extra margin (strict bbox)
+relievo \
+  --bbox examples/bboxes/rectangle_iran.geojson \
+  --demtype SRTM15Plus \
+  --template template.blend \
+  --output docs/images/hormuz_shaded_no_buffer.png \
+  --crs "+proj=aea +lat_1=27 +lat_2=37 +lat_0=32 +lon_0=54 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs" \
+  --buffer 0
+
+# Extra margin around bbox
+relievo \
+  --bbox examples/bboxes/rectangle_iran.geojson \
+  --demtype SRTM15Plus \
+  --template template.blend \
+  --output docs/images/hormuz_shaded_with_buffer.png \
+  --crs "+proj=aea +lat_1=27 +lat_2=37 +lat_0=32 +lon_0=54 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs" \
+  --buffer 1
+```
+
+| `--buffer 0` | `--buffer 1` |
+|:---:|:---:|
+| ![Hormuz without buffer](docs/images/hormuz_shaded_no_buffer.png) | ![Hormuz with larger buffer](docs/images/hormuz_shaded_with_buffer.png) |
 
 ---
 
