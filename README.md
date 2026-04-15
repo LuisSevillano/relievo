@@ -718,7 +718,7 @@ relievo \
 
 | `--buffer 0` | `--buffer 1` |
 |:---:|:---:|
-| ![Hormuz without buffer](docs/images/hormuz_shaded_no_buffer.jpg) | ![Hormuz with larger buffer](docs/images/hormuz_shaded_with_buffer.jpg) |
+| ![Hormuz without buffer](docs/images/hormuz_shaded_no_buffer.jpg) | ![Hormuz with larger buffer](docs/images/hormuz_shaded_buffer.jpg) |
 
 ---
 
