@@ -164,7 +164,7 @@ def _ensure_parent_dir(path_str: str) -> None:
 )
 @click.option(
     "--demtype",
-    default="SRTMGL1",
+    default="COP90",
     show_default=True,
     type=click.Choice(list(DEM_DATASETS.keys()), case_sensitive=True),
     help=(

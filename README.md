@@ -173,7 +173,7 @@ Options:
   --save-dem FILE              Save the raw downloaded DEM GeoTIFF for reuse with --dem.
   --save-processed-dem FILE    Save cropped/reprojected DEM in real metres (before UInt16 conversion).
   --crs TEXT                   Reproject DEM to this CRS before rendering (e.g. EPSG:32628).
-  --demtype TEXT               OpenTopography dataset key.  [default: SRTMGL1]
+  --demtype TEXT               OpenTopography dataset key.  [default: COP90]
   --api-key TEXT               OpenTopography API key (or OPENTOPO_API_KEY env var).
   --exaggeration FLOAT         Vertical exaggeration factor.
   --samples INT                Blender Cycles render samples.
@@ -686,7 +686,7 @@ Dry run - nothing will be downloaded or rendered.
 
   BBox (original):   W=-17.0400  S=27.9400  E=-15.9000  N=28.6200
   BBox (buffered):   W=-17.0970  S=27.9060  E=-15.8430  N=28.6540  (+5%)
-  DEM type:          SRTMGL1  (SRTM 30m, 1" / ~30m)
+  DEM type:          COP90  (Copernicus DSM 90m, 3" / ~90m)
   Estimated pixels:  4177 × 2620
   Blender plane:     4.177 × 2.620 units
   CRS:               (none - no reprojection)
