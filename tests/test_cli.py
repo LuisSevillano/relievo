@@ -639,6 +639,97 @@ def test_save_dem_copies_file(runner, tmp_path, bbox_file, template_file):
     assert os.path.isfile(save_path)
 
 
+def test_output_parent_directory_is_created(
+    runner, tmp_path, bbox_file, template_file, local_dem_file
+):
+    out_path = tmp_path / "nested" / "renders" / "out.png"
+    with (
+        patch("relievo.cli._find_blender", return_value="/usr/bin/blender"),
+        patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)),
+        patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)),
+        patch("relievo.cli.render"),
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "--bbox",
+                str(bbox_file),
+                "--template",
+                str(template_file),
+                "--output",
+                str(out_path),
+                "--dem",
+                str(local_dem_file),
+            ],
+        )
+    assert result.exit_code == 0
+    assert out_path.parent.is_dir()
+
+
+def test_save_dem_parent_directory_is_created(runner, tmp_path, bbox_file, template_file):
+    save_path = tmp_path / "nested" / "dem" / "saved.tif"
+    with (
+        patch("relievo.cli._find_blender", return_value="/usr/bin/blender"),
+        patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)),
+        patch(
+            "relievo.cli.download_dem",
+            side_effect=lambda bbox, dt, key, path, **kw: open(path, "wb").write(b"TIFF"),
+        ),
+        patch("relievo.cli.process_dem", return_value=_make_process_result(tmp_path)),
+        patch("relievo.cli.render"),
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "--bbox",
+                str(bbox_file),
+                "--template",
+                str(template_file),
+                "--output",
+                str(tmp_path / "out.png"),
+                "--api-key",
+                "TESTKEY",
+                "--save-dem",
+                str(save_path),
+            ],
+        )
+    assert result.exit_code == 0
+    assert save_path.is_file()
+
+
+def test_save_processed_dem_parent_directory_is_created(
+    runner, tmp_path, bbox_file, template_file, local_dem_file
+):
+    save_processed = tmp_path / "nested" / "processed" / "dem_m.tif"
+
+    def fake_process(**kwargs):
+        assert save_processed.parent.is_dir()
+        return _make_process_result(tmp_path)
+
+    with (
+        patch("relievo.cli._find_blender", return_value="/usr/bin/blender"),
+        patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)),
+        patch("relievo.cli.process_dem", side_effect=fake_process),
+        patch("relievo.cli.render"),
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "--bbox",
+                str(bbox_file),
+                "--template",
+                str(template_file),
+                "--output",
+                str(tmp_path / "out.png"),
+                "--dem",
+                str(local_dem_file),
+                "--save-processed-dem",
+                str(save_processed),
+            ],
+        )
+    assert result.exit_code == 0
+
+
 # ---------------------------------------------------------------------------
 # --local-dem skips download
 # ---------------------------------------------------------------------------

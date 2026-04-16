@@ -78,6 +78,13 @@ def _validate_output_path(output_path: str) -> None:
         raise click.UsageError(f"Unsupported output format '{suffix}'. Use one of: {allowed}.")
 
 
+def _ensure_parent_dir(path_str: str) -> None:
+    """Create parent directory for a file path if it does not exist."""
+    parent = pathlib.Path(path_str).parent
+    if parent and not parent.exists():
+        parent.mkdir(parents=True, exist_ok=True)
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, "-V", "--version", prog_name="relievo")
 @click.option(
@@ -363,6 +370,7 @@ def main(
     output_abs = str(pathlib.Path(output).resolve())
     bbox_abs = str(pathlib.Path(bbox).resolve()) if bbox else None
     _validate_output_path(output_abs)
+    _ensure_parent_dir(output_abs)
 
     # Validate bbox before anything else (including Blender lookup)
     if dem is None and not bbox:
@@ -460,6 +468,7 @@ def main(
             download_dem(download_bbox, demtype, api_key, raw_dem_path)
             if save_dem:
                 save_dem_abs = str(pathlib.Path(save_dem).resolve())
+                _ensure_parent_dir(save_dem_abs)
                 shutil.copy2(raw_dem_path, save_dem_abs)
                 log.info(f"DEM saved  →  {save_dem_abs}")
             input_dem = raw_dem_path
@@ -471,6 +480,8 @@ def main(
         save_processed_abs = (
             str(pathlib.Path(save_processed_dem).resolve()) if save_processed_dem else None
         )
+        if save_processed_abs:
+            _ensure_parent_dir(save_processed_abs)
         result = process_dem(
             input_dem=input_dem,
             bbox_wgs84=bbox_wgs84,
