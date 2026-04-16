@@ -91,39 +91,28 @@ The Blender step follows the Daniel Huffman shaded relief method: the DEM drives
 
 ## Installation
 
-### Prerequisites
+Install Blender first: [blender.org](https://www.blender.org/download/).
 
-Core requirements (always needed):
+### Fastest setup (recommended)
 
-| Dependency | Required for | Notes |
-|---|---|---|
-| Python ≥ 3.9 | CLI runtime | `conda` or `pyenv` |
-| Blender ≥ 3.6 | rendering | [blender.org](https://www.blender.org/download/) |
-| GDAL ≥ 3.6 | DEM processing + `--color-relief` | includes `gdaldem` |
-
-Optional (only for automatic download):
-
-| Dependency | Required for | Notes |
-|---|---|---|
-| OpenTopography API key | DEM download when `--dem` is not used | [opentopography.org](https://opentopography.org/developers) (free) |
-
-> GDAL must be installed through **conda-forge**. `pip install gdal` is not reliable.
-
-### Conda (recommended)
+Use **micromamba** (recommended).
 
 ```bash
-git clone https://github.com/youruser/relievo.git
+git clone https://github.com/luissevillano/relievo.git
 cd relievo
 
-conda env create -f environment.yml
-conda activate relievo
+curl -Ls https://micro.mamba.pm/install.sh | bash
+# open a new terminal (or restart your shell)
+
+micromamba env create -f environment.yml
+micromamba activate relievo
 pip install -e .
 ```
 
-### Manual
+### If you already use Conda
 
 ```bash
-conda create -n relievo -c conda-forge python=3.11 gdal pyproj
+conda env create -f environment.yml
 conda activate relievo
 pip install -e .
 ```
@@ -134,6 +123,14 @@ pip install -e .
 relievo --help
 relievo --list-demtypes
 ```
+
+Optional: set an OpenTopography API key only if you want automatic DEM downloads (not needed when using `--dem` with a local file):
+
+```bash
+export OPENTOPO_API_KEY=your_key_here
+```
+
+Quick start below shows both modes: with automatic download (`--api-key` / `OPENTOPO_API_KEY`) and with a local DEM (`--dem`).
 
 ---
 
