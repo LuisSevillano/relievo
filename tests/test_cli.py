@@ -1030,6 +1030,110 @@ def test_max_size_passed_to_render(runner, tmp_path, bbox_file, template_file, l
 
 
 # ---------------------------------------------------------------------------
+# --filter-values
+# ---------------------------------------------------------------------------
+
+
+def test_filter_values_passed_to_process_dem(
+    runner, tmp_path, bbox_file, template_file, local_dem_file
+):
+    captured = {}
+
+    def fake_process(**kwargs):
+        captured.update(kwargs)
+        return _make_process_result(tmp_path)
+
+    with (
+        patch("relievo.cli._find_blender", return_value="/usr/bin/blender"),
+        patch("relievo.cli.extract_wgs84_bbox", return_value=(10.0, 45.0, 11.0, 46.0)),
+        patch("relievo.cli.process_dem", side_effect=fake_process),
+        patch("relievo.cli.render"),
+    ):
+        result = runner.invoke(
+            main,
+            [
+                "--bbox",
+                str(bbox_file),
+                "--template",
+                str(template_file),
+                "--output",
+                str(tmp_path / "out.png"),
+                "--dem",
+                str(local_dem_file),
+                "--filter-values",
+                "-5000:0",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert captured.get("filter_values") == (-5000.0, 0.0)
+
+
+def test_filter_values_invalid_format(runner, tmp_path, bbox_file, template_file, local_dem_file):
+    result = runner.invoke(
+        main,
+        [
+            "--bbox",
+            str(bbox_file),
+            "--template",
+            str(template_file),
+            "--output",
+            str(tmp_path / "out.png"),
+            "--dem",
+            str(local_dem_file),
+            "--filter-values",
+            "-5000-0",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Invalid format for --filter-values" in result.output
+
+
+def test_filter_values_both_bounds_empty_invalid(
+    runner, tmp_path, bbox_file, template_file, local_dem_file
+):
+    result = runner.invoke(
+        main,
+        [
+            "--bbox",
+            str(bbox_file),
+            "--template",
+            str(template_file),
+            "--output",
+            str(tmp_path / "out.png"),
+            "--dem",
+            str(local_dem_file),
+            "--filter-values",
+            ":",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "at least one bound is required" in result.output
+
+
+def test_dry_run_shows_filter_values(runner, tmp_path, bbox_file, template_file):
+    result = runner.invoke(
+        main,
+        [
+            "--bbox",
+            str(bbox_file),
+            "--template",
+            str(template_file),
+            "--output",
+            str(tmp_path / "out.png"),
+            "--api-key",
+            "TESTKEY",
+            "--filter-values",
+            "-5000:0",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "DEM filter" in result.output
+    assert "-5000:0" in result.output
+
+
+# ---------------------------------------------------------------------------
 # --color-relief
 # ---------------------------------------------------------------------------
 

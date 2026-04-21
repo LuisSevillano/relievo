@@ -1,5 +1,7 @@
 """Main CLI entry point for relievo."""
 
+from __future__ import annotations
+
 import os
 import pathlib
 import shutil
@@ -83,6 +85,33 @@ def _ensure_parent_dir(path_str: str) -> None:
     parent = pathlib.Path(path_str).parent
     if parent and not parent.exists():
         parent.mkdir(parents=True, exist_ok=True)
+
+
+def _parse_filter_values(ctx, param, value) -> tuple | None:
+    """Parse --filter-values MIN:MAX into (min, max) tuple."""
+    if value is None or ctx.resilient_parsing:
+        return None
+    try:
+        parts = value.split(":")
+        if len(parts) != 2:
+            raise click.UsageError(
+                f"Invalid format for --filter-values: '{value}'. Use MIN:MAX (e.g. '-5000:0', '0:', ':-200')."
+            )
+        min_val = float(parts[0]) if parts[0] else None
+        max_val = float(parts[1]) if parts[1] else None
+        if min_val is not None and max_val is not None and min_val > max_val:
+            raise click.UsageError(
+                f"Invalid range for --filter-values: MIN must be <= MAX. Got '{value}'."
+            )
+        if min_val is None and max_val is None:
+            raise click.UsageError(
+                "Invalid range for --filter-values: at least one bound is required (e.g. '0:' or ':-200')."
+            )
+        return (min_val, max_val)
+    except ValueError as e:
+        raise click.UsageError(
+            f"Invalid values in --filter-values: '{value}'. Must be numbers or empty. {e}"
+        )
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -190,6 +219,17 @@ def _ensure_parent_dir(path_str: str) -> None:
         "back (bilinear) to blur terrain detail before rendering. "
         "Values between 2 and 8 are typical; higher values produce softer relief. "
         "Useful for regional/national-scale maps following Huffman's recommendations."
+    ),
+)
+@click.option(
+    "--filter-values",
+    default=None,
+    type=str,
+    callback=_parse_filter_values,
+    help=(
+        "Filter DEM to a range of elevation values (format: MIN:MAX). "
+        "Values outside this range become NoData. "
+        "Examples: '-5000:0' (bathymetry only), '0:' (land only), ':-200' (below -200m)."
     ),
 )
 @click.option(
@@ -336,6 +376,7 @@ def main(
     verbose,
     blender_bin,
     keep_workdir,
+    filter_values=None,
 ):
     """Create a shaded relief image from a DEM using Blender.
 
@@ -394,6 +435,7 @@ def main(
             color_ramp,
             color_relief_mode,
             color_relief_blend,
+            filter_values,
             clip_mask,
             worldfile,
             no_render,
@@ -490,6 +532,7 @@ def main(
             workdir=workdir,
             save_processed_dem=save_processed_abs,
             smooth=smooth,
+            filter_values=filter_values,
         )
 
         if no_render:
@@ -581,6 +624,7 @@ def _print_dry_run(
     color_ramp,
     color_relief_mode,
     color_relief_blend,
+    filter_values,
     clip_mask,
     worldfile,
     no_render,
@@ -619,6 +663,11 @@ def _print_dry_run(
         click.echo(f"  Blender plane:     {plane_x:.3f} × {plane_y:.3f} units")
 
     click.echo(f"  CRS:               {crs if crs else '(none - no reprojection)'}")
+    if filter_values is not None:
+        fmin, fmax = filter_values
+        min_label = "" if fmin is None else f"{fmin:g}"
+        max_label = "" if fmax is None else f"{fmax:g}"
+        click.echo(f"  DEM filter:        {min_label}:{max_label}")
 
     res_note = f"{max_size}px longest side" if max_size else "(from template)"
     click.echo(f"  Render resolution: {res_note}  @ {scale}%")

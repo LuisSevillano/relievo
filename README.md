@@ -60,6 +60,7 @@ And this is the Blender setup it automates behind the scenes, so you can keep th
 - **TOML config profiles** - keep per-project defaults in a file; no more long commands.
 - **Dry run** - preview the download size and pixel count before committing.
 - **CRS reprojection** - reproject the DEM to any metric CRS before rendering.
+- **Elevation filtering** - keep only selected elevation ranges (`--filter-values MIN:MAX`) for bathymetry-only or land-only workflows.
 
 ---
 
@@ -182,6 +183,7 @@ Options:
   --light-azimuth FLOAT        Sun azimuth in degrees (0 = North, clockwise).
   --light-altitude FLOAT       Sun altitude in degrees (0 = horizon, 90 = overhead).
   --smooth FLOAT               DEM smoothing factor (>1). Blurs terrain before rendering.
+  --filter-values TEXT         Keep only DEM values within MIN:MAX; outside values become NoData.
   --color-relief FILE          gdaldem colour ramp file for hypsometric tint.
   --color-relief-mode TEXT     overlay | separate | both.  [default: overlay]
   --color-relief-blend TEXT    multiply | linearburn.  [default: multiply]
@@ -320,6 +322,36 @@ relievo \
   --dem /data/mdt05-canarias.tif \
   --output tenerife.png
 ```
+
+---
+
+### 3. Large-area strategy with mixed land/sea DEMs (`--filter-values`)
+
+Some high-resolution datasets (30 m / 90 m) cannot cover very large extents in a single OpenTopography request. A practical workaround is to fetch a broader-coverage DEM (for example GEBCO/SRTM15Plus) and filter elevations so you keep only what you need.
+
+Using `examples/bboxes/arabigo_bbox.geojson`:
+
+```bash
+# Bathymetry only (<= 0 m)
+relievo \
+  --bbox examples/bboxes/arabigo_bbox.geojson \
+  --template template.blend \
+  --demtype GEBCOIceTopo \
+  --filter-values "-12000:0" \
+  --output arabigo_bathymetry.jpg
+```
+
+```bash
+# Altimetry only (>= 0 m)
+relievo \
+  --bbox examples/bboxes/arabigo_bbox.geojson \
+  --template template.blend \
+  --demtype GEBCOIceTopo \
+  --filter-values "0:" \
+  --output arabigo_altimetry.jpg
+```
+
+This is especially useful when you want to combine broad-coverage bathymetry with a separate, higher-resolution land DEM in post-processing.
 
 > `--bbox` is still used to crop the DEM to the area of interest.
 

@@ -14,6 +14,7 @@ from pathlib import Path
 
 try:
     from osgeo import gdal
+
     gdal.UseExceptions()
     _GDAL_AVAILABLE = True
 except ImportError:
@@ -28,26 +29,29 @@ from . import log
 def _require_gdal():
     if not _GDAL_AVAILABLE:
         raise ImportError(
-            "GDAL Python bindings not found. Install via:\n"
-            "  conda install -c conda-forge gdal"
+            "GDAL Python bindings not found. Install via:\n  conda install -c conda-forge gdal"
         )
 
 
 @dataclass
 class ProcessResult:
-    dem_path: str        # UInt16 rescaled DEM for Blender
-    source_dem_path: str # DEM with real elevation values in metres
+    dem_path: str  # UInt16 rescaled DEM for Blender
+    source_dem_path: str  # DEM with real elevation values in metres
     width_m: float
     height_m: float
     raster_x: int
     raster_y: int
-    src_min: float = 0.0   # minimum elevation (metres) used for UInt16 scaling
-    src_max: float = 0.0   # maximum elevation (metres) used for UInt16 scaling
+    src_min: float = 0.0  # minimum elevation (metres) used for UInt16 scaling
+    src_max: float = 0.0  # maximum elevation (metres) used for UInt16 scaling
 
 
 def reproject_bbox(
-    west: float, south: float, east: float, north: float,
-    src_crs: str, dst_crs: str,
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+    src_crs: str,
+    dst_crs: str,
 ) -> tuple:
     """Reproject bbox corners from src_crs to dst_crs.
 
@@ -91,7 +95,8 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
     coarse_path = str(Path(workdir) / "_smooth_coarse.tif")
     # Step 1 - average-downsample to coarse resolution
     gdal.Warp(
-        coarse_path, input_path,
+        coarse_path,
+        input_path,
         options=gdal.WarpOptions(
             xRes=orig_x_res * factor,
             yRes=orig_y_res * factor,
@@ -101,7 +106,8 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
     )
     # Step 2 - bilinear-upsample back to original resolution
     gdal.Warp(
-        output_path, coarse_path,
+        output_path,
+        coarse_path,
         options=gdal.WarpOptions(
             xRes=orig_x_res,
             yRes=orig_y_res,
@@ -110,6 +116,7 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
         ),
     )
     import os as _os
+
     _os.remove(coarse_path)
 
 
@@ -121,6 +128,7 @@ def process_dem(
     workdir: str,
     save_processed_dem: str | None = None,
     smooth: float | None = None,
+    filter_values: tuple | None = None,
 ) -> ProcessResult:
     """Reproject (optional), smooth (optional), crop (optional), and rescale a DEM for Blender.
 
@@ -133,6 +141,8 @@ def process_dem(
         save_processed_dem: If given, copy the cropped/reprojected DEM (real metres) here.
         smooth: Smoothing factor (e.g. 4). Downsamples by this factor then upsamples back
                 to blur the DEM before rendering. None or 0 means no smoothing.
+        filter_values: (min, max) tuple to filter elevation values. Values outside this
+                range become NoData. None means no filtering.
     """
     _require_gdal()
     if target_crs:
@@ -140,7 +150,8 @@ def process_dem(
         log.info(f"Processing DEM  →  {target_crs}")
         log.debug("Reprojecting...")
         result = gdal.Warp(
-            reprojected_path, input_dem,
+            reprojected_path,
+            input_dem,
             options=gdal.WarpOptions(dstSRS=target_crs, resampleAlg="bilinear", format="GTiff"),
         )
         if result is None:
@@ -157,13 +168,74 @@ def process_dem(
         _smooth_dem(reprojected_path, smoothed_path, smooth, workdir)
         reprojected_path = smoothed_path
 
+    # Filter by elevation range (optional) - values outside range become NoData
+    if filter_values is not None:
+        filter_min, filter_max = filter_values
+        filtered_path = str(Path(workdir) / "a2c_filtered.tif")
+        min_label = "" if filter_min is None else f"{filter_min:g}"
+        max_label = "" if filter_max is None else f"{filter_max:g}"
+        log.info(f"Filtering DEM values: {min_label}:{max_label}")
+        log.debug(f"Filtering DEM to elevation range: {filter_values}...")
+        # Use band math to set values outside range to NoData
+        # Build a VRT with the filter to avoid creating full raster in memory
+        filter_exp = []
+        if filter_min is not None and filter_max is not None:
+            filter_exp = f"(a < {filter_min}) OR (a > {filter_max})"
+        elif filter_min is not None:
+            filter_exp = f"(a < {filter_min})"
+        elif filter_max is not None:
+            filter_exp = f"(a > {filter_max})"
+
+        if filter_exp:
+            # Use gdal_calc to filter - values outside range become nodata
+            import numpy as np
+
+            # Read, filter, write
+            ds = gdal.Open(reprojected_path)
+            band = ds.GetRasterBand(1)
+            nodata = band.GetNoDataValue()
+            if nodata is None:
+                nodata = -32768
+            data = band.ReadAsArray()
+            # Create mask: True where value is outside range
+            mask = np.zeros_like(data, dtype=bool)
+            if filter_min is not None:
+                mask |= data < filter_min
+            if filter_max is not None:
+                mask |= data > filter_max
+            # Apply: outside range → nodata, keep original where inside
+            data_filtered = data.copy()
+            data_filtered[mask] = nodata
+            # Get geotransform and projection from original
+            gt = ds.GetGeoTransform()
+            projection = ds.GetProjection()
+            # Write filtered raster
+            driver = gdal.GetDriverByName("GTiff")
+            if ds is not None:
+                ds = None
+            out_ds = driver.Create(filtered_path, band.XSize, band.YSize, 1, band.DataType)
+            out_ds.SetGeoTransform(gt)
+            out_ds.SetProjection(projection)
+            out_band = out_ds.GetRasterBand(1)
+            out_band.WriteArray(data_filtered)
+            out_band.SetNoDataValue(nodata)
+            out_band.FlushCache()
+            out_ds.FlushCache()
+            out_ds = None
+            reprojected_path = filtered_path
+
     # Crop first (if bbox given) so that src_min/src_max reflect only the
     # area of interest - not the entire raster extent.
     if bbox_wgs84 is not None:
         west_wgs, south_wgs, east_wgs, north_wgs = bbox_wgs84
         if target_crs:
             west_m, south_m, east_m, north_m = reproject_bbox(
-                west_wgs, south_wgs, east_wgs, north_wgs, "EPSG:4326", target_crs,
+                west_wgs,
+                south_wgs,
+                east_wgs,
+                north_wgs,
+                "EPSG:4326",
+                target_crs,
             )
         else:
             west_m, south_m, east_m, north_m = west_wgs, south_wgs, east_wgs, north_wgs
@@ -172,7 +244,8 @@ def process_dem(
         cropped_path = str(Path(workdir) / "a3_cropped.tif")
         log.debug("Cropping to bbox...")
         ds_crop = gdal.Translate(
-            cropped_path, reprojected_path,
+            cropped_path,
+            reprojected_path,
             options=gdal.TranslateOptions(projWin=proj_win, format="GTiff"),
         )
         if ds_crop is None:
@@ -186,14 +259,24 @@ def process_dem(
     log.debug("Computing elevation statistics on cropped area...")
     ds = gdal.Open(stats_path)
     band = ds.GetRasterBand(1)
-    band.ComputeStatistics(False)
+    try:
+        band.ComputeStatistics(False)
+    except RuntimeError as exc:
+        raise ValueError(
+            "No valid DEM pixels after filtering/cropping. Expand the bbox or relax --filter-values."
+        ) from exc
     src_min = band.GetMinimum()
     src_max = band.GetMaximum()
+    if src_min is None or src_max is None:
+        raise ValueError(
+            "No valid DEM pixels after filtering/cropping. Expand the bbox or relax --filter-values."
+        )
     ds = None
 
     # Optionally save the processed (cropped + reprojected, real metres) DEM
     if save_processed_dem:
         import shutil as _shutil
+
         _shutil.copy2(stats_path, save_processed_dem)
         log.info(f"Processed DEM saved  →  {save_processed_dem}")
 
@@ -206,7 +289,8 @@ def process_dem(
     # when the source nodata value (e.g. -32768 in SRTM15Plus) is out of the
     # UInt16 range.
     ds = gdal.Translate(
-        output_path, stats_path,
+        output_path,
+        stats_path,
         options=gdal.TranslateOptions(
             outputType=gdal.GDT_UInt16,
             scaleParams=[[src_min, src_max, 1, 65535]],
@@ -224,7 +308,9 @@ def process_dem(
     height_m = abs(gt[5]) * raster_y
     ds = None
 
-    log.debug(f"DEM processed: {width_m:.1f} x {height_m:.1f} CRS units  ({raster_x}×{raster_y} px)")
+    log.debug(
+        f"DEM processed: {width_m:.1f} x {height_m:.1f} CRS units  ({raster_x}×{raster_y} px)"
+    )
     return ProcessResult(
         dem_path=output_path,
         source_dem_path=stats_path,  # real elevation values in metres

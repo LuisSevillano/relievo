@@ -182,3 +182,20 @@ def test_process_dem_pixel_dimensions_reasonable(tmp_path):
     # Should be approximately 80×80 pixels (0.8° of a 100px/1° raster)
     assert 60 <= result.raster_x <= 100
     assert 60 <= result.raster_y <= 100
+
+
+def test_process_dem_filter_excludes_all_pixels_raises(tmp_path):
+    """If filter removes all valid cells, process_dem should fail clearly."""
+    dem_path = str(tmp_path / "input.tif")
+    output_path = str(tmp_path / "output.tif")
+    _make_dem_tif(dem_path, fill_value=5000)
+
+    with pytest.raises(ValueError, match="No valid DEM pixels"):
+        process_dem(
+            input_dem=dem_path,
+            bbox_wgs84=(10.2, 45.2, 10.8, 45.8),
+            target_crs=None,
+            output_path=output_path,
+            workdir=str(tmp_path),
+            filter_values=(None, 1000.0),
+        )

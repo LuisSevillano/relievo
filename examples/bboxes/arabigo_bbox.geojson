@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "arabigo_bbox",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 1 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 52.442153084, 13.94420433 ], [ 70.855876142, 13.94420433 ], [ 70.855876142, 32.357927388 ], [ 52.442153084, 32.357927388 ], [ 52.442153084, 13.94420433 ] ] ] } }
+]
+}
