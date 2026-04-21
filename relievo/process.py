@@ -9,6 +9,7 @@ Replicates the logic of blenderize.sh by Nick Underwood:
 
 from __future__ import annotations
 
+from array import array
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -120,6 +121,76 @@ def _smooth_dem(input_path: str, output_path: str, factor: float, workdir: str) 
     _os.remove(coarse_path)
 
 
+def _default_nodata_for_type(data_type: int):
+    if data_type in (gdal.GDT_Byte, gdal.GDT_UInt16, gdal.GDT_UInt32):
+        return 0
+    if data_type == gdal.GDT_Int16:
+        return -32768
+    if data_type == gdal.GDT_Int32:
+        return -2147483648
+    return -9999.0
+
+
+def _array_typecode_for_gdal(data_type: int) -> str:
+    mapping = {
+        gdal.GDT_Byte: "B",
+        gdal.GDT_UInt16: "H",
+        gdal.GDT_Int16: "h",
+        gdal.GDT_UInt32: "I",
+        gdal.GDT_Int32: "i",
+        gdal.GDT_Float32: "f",
+        gdal.GDT_Float64: "d",
+    }
+    if data_type not in mapping:
+        raise RuntimeError(f"Unsupported GDAL data type for filtering: {data_type}")
+    return mapping[data_type]
+
+
+def _filter_dem_values(
+    input_path: str,
+    output_path: str,
+    filter_min: float | None,
+    filter_max: float | None,
+) -> None:
+    ds = gdal.Open(input_path)
+    if ds is None:
+        raise RuntimeError(f"Cannot open DEM for filtering: {input_path}")
+    band = ds.GetRasterBand(1)
+    data_type = band.DataType
+    nodata = band.GetNoDataValue()
+    if nodata is None:
+        nodata = _default_nodata_for_type(data_type)
+
+    driver = gdal.GetDriverByName("GTiff")
+    out_ds = driver.Create(output_path, ds.RasterXSize, ds.RasterYSize, 1, data_type)
+    out_ds.SetGeoTransform(ds.GetGeoTransform())
+    out_ds.SetProjection(ds.GetProjection())
+    out_band = out_ds.GetRasterBand(1)
+    out_band.SetNoDataValue(nodata)
+
+    typecode = _array_typecode_for_gdal(data_type)
+    nodata_write = int(nodata) if typecode in {"B", "H", "h", "I", "i"} else float(nodata)
+    xsize = ds.RasterXSize
+    ysize = ds.RasterYSize
+
+    for y in range(ysize):
+        raw = band.ReadRaster(0, y, xsize, 1, buf_type=data_type)
+        values = array(typecode)
+        values.frombytes(raw)
+        for i, v in enumerate(values):
+            if filter_min is not None and v < filter_min:
+                values[i] = nodata_write
+                continue
+            if filter_max is not None and v > filter_max:
+                values[i] = nodata_write
+        out_band.WriteRaster(0, y, xsize, 1, values.tobytes(), buf_type=data_type)
+
+    out_band.FlushCache()
+    out_ds.FlushCache()
+    out_ds = None
+    ds = None
+
+
 def process_dem(
     input_dem: str,
     bbox_wgs84: tuple | None,
@@ -176,53 +247,8 @@ def process_dem(
         max_label = "" if filter_max is None else f"{filter_max:g}"
         log.info(f"Filtering DEM values: {min_label}:{max_label}")
         log.debug(f"Filtering DEM to elevation range: {filter_values}...")
-        # Use band math to set values outside range to NoData
-        # Build a VRT with the filter to avoid creating full raster in memory
-        filter_exp = []
-        if filter_min is not None and filter_max is not None:
-            filter_exp = f"(a < {filter_min}) OR (a > {filter_max})"
-        elif filter_min is not None:
-            filter_exp = f"(a < {filter_min})"
-        elif filter_max is not None:
-            filter_exp = f"(a > {filter_max})"
-
-        if filter_exp:
-            # Use gdal_calc to filter - values outside range become nodata
-            import numpy as np
-
-            # Read, filter, write
-            ds = gdal.Open(reprojected_path)
-            band = ds.GetRasterBand(1)
-            nodata = band.GetNoDataValue()
-            if nodata is None:
-                nodata = -32768
-            data = band.ReadAsArray()
-            # Create mask: True where value is outside range
-            mask = np.zeros_like(data, dtype=bool)
-            if filter_min is not None:
-                mask |= data < filter_min
-            if filter_max is not None:
-                mask |= data > filter_max
-            # Apply: outside range → nodata, keep original where inside
-            data_filtered = data.copy()
-            data_filtered[mask] = nodata
-            # Get geotransform and projection from original
-            gt = ds.GetGeoTransform()
-            projection = ds.GetProjection()
-            # Write filtered raster
-            driver = gdal.GetDriverByName("GTiff")
-            if ds is not None:
-                ds = None
-            out_ds = driver.Create(filtered_path, band.XSize, band.YSize, 1, band.DataType)
-            out_ds.SetGeoTransform(gt)
-            out_ds.SetProjection(projection)
-            out_band = out_ds.GetRasterBand(1)
-            out_band.WriteArray(data_filtered)
-            out_band.SetNoDataValue(nodata)
-            out_band.FlushCache()
-            out_ds.FlushCache()
-            out_ds = None
-            reprojected_path = filtered_path
+        _filter_dem_values(reprojected_path, filtered_path, filter_min, filter_max)
+        reprojected_path = filtered_path
 
     # Crop first (if bbox given) so that src_min/src_max reflect only the
     # area of interest - not the entire raster extent.
